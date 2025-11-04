@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Google OAuth client secret
+app/client_secret_*.json
