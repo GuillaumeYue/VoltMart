@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "580096274172",
+    "project_id": "voltmart-992a3",
+    "storage_bucket": "voltmart-992a3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:580096274172:android:a872ffd125033ac7063179",
+        "android_client_info": {
+          "package_name": "com.example.voltmart"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB6TWpeptOm-B29zpTDjanxFtPbTgTLfz0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
