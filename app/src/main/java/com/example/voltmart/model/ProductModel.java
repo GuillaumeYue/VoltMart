@@ -1,8 +1,9 @@
 package com.example.voltmart.model;
 
+import java.io.Serializable;
 import java.util.List;
 
-public class ProductModel {
+public class ProductModel implements Serializable {
     private String name;
     private List<String> searchKey;
     private String image;

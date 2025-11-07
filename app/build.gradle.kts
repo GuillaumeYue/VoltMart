@@ -59,6 +59,8 @@ dependencies {
     implementation("org.imaginativeworld.whynotimagecarousel:whynotimagecarousel:2.1.0")
     implementation("com.facebook.shimmer:shimmer:0.5.0")
     implementation("com.squareup.picasso:picasso:2.71828")
+    implementation("com.makeramen:roundedimageview:2.3.0")
+    implementation("com.github.f0ris.sweetalert:library:1.6.2")
 
 }
 apply(plugin = "com.google.gms.google-services")

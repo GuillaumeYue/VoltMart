@@ -96,7 +96,7 @@ public class CartFragment extends Fragment {
         public void onReceive(Context context, Intent intent) {
             totalPrice = intent.getIntExtra("totalPrice", 1000);
 //            Log.i("Price", totalPrice+"");
-            cartPriceTextView.setText("₹ " + totalPrice);
+            cartPriceTextView.setText("$ " + totalPrice);
         }
     };
 

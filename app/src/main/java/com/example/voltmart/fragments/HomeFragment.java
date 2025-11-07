@@ -15,109 +15,107 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.voltmart.R;
+import com.example.voltmart.activities.MainActivity;
+import com.example.voltmart.adapters.CategoryAdapter;
+import com.example.voltmart.adapters.ProductAdapter;
+import com.example.voltmart.model.CategoryModel;
+import com.example.voltmart.model.ProductModel;
+import com.example.voltmart.utils.FirebaseUtil;
+import com.facebook.shimmer.ShimmerFrameLayout;
+import com.firebase.ui.firestore.FirestoreRecyclerOptions;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
+import com.mancj.materialsearchbar.MaterialSearchBar;
+
+import org.imaginativeworld.whynotimagecarousel.ImageCarousel;
+import org.imaginativeworld.whynotimagecarousel.model.CarouselItem;
 
 /**
  * HomeFragment – 显示主页内容（无 shimmer，基础控件版）
  */
 public class HomeFragment extends Fragment {
 
-    private ProgressBar progressBar;
-    private LinearLayout mainLinearLayout;
-    private RecyclerView categoryRecyclerView, productRecyclerView;
+    RecyclerView categoryRecyclerView, productRecyclerView;
+    MaterialSearchBar searchBar;
+    ImageCarousel carousel;
+    ShimmerFrameLayout shimmerFrameLayout;
+    LinearLayout mainLinearLayout;
+
+    CategoryAdapter categoryAdapter;
+    ProductAdapter productAdapter;
+
+//    TextView textView;
 
     public HomeFragment() {
         // Required empty public constructor
-    }
-
-    public static HomeFragment newInstance(String param1, String param2) {
-        HomeFragment fragment = new HomeFragment();
-        Bundle args = new Bundle();
-        args.putString("param1", param1);
-        args.putString("param2", param2);
-        fragment.setArguments(args);
-        return fragment;
     }
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
 
+        // Inflate the layout for this fragment
         View view = inflater.inflate(R.layout.fragment_home, container, false);
-
-        // 绑定视图
-        progressBar = view.findViewById(R.id.progressBar);
-        mainLinearLayout = view.findViewById(R.id.mainLinearLayout);
+        searchBar = getActivity().findViewById(R.id.searchBar);
+//        textView = view.findViewById(R.id.textView);
         categoryRecyclerView = view.findViewById(R.id.categoryRecyclerView);
         productRecyclerView = view.findViewById(R.id.productRecyclerView);
+        carousel = view.findViewById(R.id.carousel);
+        shimmerFrameLayout = view.findViewById(R.id.shimmerLayout);
+        mainLinearLayout = view.findViewById(R.id.mainLinearLayout);
 
-        // 模拟加载中
-        showLoading(true);
+        MainActivity activity = (MainActivity) getActivity();
+        activity.showSearchBar();
+        shimmerFrameLayout.startShimmer();
 
-        // 这里你可以改成真正的数据库或 API 调用
-        view.postDelayed(() -> {
-            initCategoryList();
-            initProductList();
-            showLoading(false);
-        }, 1000);
+//        textView.setOnClickListener(v -> {
+//            startActivity(new Intent(getActivity(), AdminActivity.class));
+//        });
+
+        initCarousel();
+        initCategories();
+        initProducts();
 
         return view;
     }
 
-    private void initCategoryList() {
-        // 用最基础的测试数据
-        categoryRecyclerView.setLayoutManager(new GridLayoutManager(getContext(), 4));
-        categoryRecyclerView.setAdapter(new SimpleTextAdapter(new String[]{
-                "Phone", "Laptop", "Tablet", "Headset"
-        }));
-    }
-
-    private void initProductList() {
-        productRecyclerView.setLayoutManager(new GridLayoutManager(getContext(), 2));
-        productRecyclerView.setAdapter(new SimpleTextAdapter(new String[]{
-                "iPhone 15", "Galaxy S24", "MacBook Air", "Pixel 9"
-        }));
-    }
-
-    private void showLoading(boolean loading) {
-        progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
-        mainLinearLayout.setVisibility(loading ? View.GONE : View.VISIBLE);
-    }
-
-    /**
-     * 简单的 Adapter – 只显示文本占位
-     */
-    private static class SimpleTextAdapter extends RecyclerView.Adapter<SimpleTextAdapter.ViewHolder> {
-        private final String[] data;
-
-        SimpleTextAdapter(String[] data) {
-            this.data = data;
-        }
-
-        @NonNull
-        @Override
-        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            TextView tv = new TextView(parent.getContext());
-            tv.setPadding(16, 24, 16, 24);
-            tv.setTextSize(16);
-            return new ViewHolder(tv);
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            holder.textView.setText(data[position]);
-        }
-
-        @Override
-        public int getItemCount() {
-            return data.length;
-        }
-
-        static class ViewHolder extends RecyclerView.ViewHolder {
-            TextView textView;
-            ViewHolder(@NonNull View itemView) {
-                super(itemView);
-                textView = (TextView) itemView;
+    private void initCarousel() {
+        FirebaseUtil.getBanner().orderBy("bannerId").get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+            @Override
+            public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                if (task.isSuccessful()) {
+                    for (QueryDocumentSnapshot document : task.getResult()) {
+                        carousel.addData(new CarouselItem(document.get("bannerImage").toString()));
+                    }
+                }
             }
-        }
+        });
+    }
+
+    private void initCategories() {
+        Query query = FirebaseUtil.getCategories();
+        FirestoreRecyclerOptions<CategoryModel> options = new FirestoreRecyclerOptions.Builder<CategoryModel>()
+                .setQuery(query, CategoryModel.class)
+                .build();
+
+        categoryAdapter = new CategoryAdapter(options, getContext());
+        categoryRecyclerView.setLayoutManager(new GridLayoutManager(getContext(), 4));
+        categoryRecyclerView.setAdapter(categoryAdapter);
+        categoryAdapter.startListening();
+    }
+
+    private void initProducts() {
+        Query query = FirebaseUtil.getProducts();
+        FirestoreRecyclerOptions<ProductModel> options = new FirestoreRecyclerOptions.Builder<ProductModel>()
+                .setQuery(query, ProductModel.class)
+                .build();
+
+        productAdapter = new ProductAdapter(options, getContext());
+        productRecyclerView.setLayoutManager(new GridLayoutManager(getContext(), 2));
+        productRecyclerView.setAdapter(productAdapter);
+        productAdapter.startListening();
     }
 }

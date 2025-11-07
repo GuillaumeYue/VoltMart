@@ -21,6 +21,7 @@ import androidx.fragment.app.FragmentTransaction;
 import com.example.voltmart.R;
 import com.example.voltmart.fragments.CartFragment;
 import com.example.voltmart.fragments.HomeFragment;
+import com.example.voltmart.fragments.ProductFragment;
 import com.example.voltmart.fragments.ProfileFragment;
 import com.example.voltmart.fragments.SearchFragment;
 import com.example.voltmart.fragments.WishlistFragment;
@@ -212,5 +213,5 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
     }
-    }
+
 }

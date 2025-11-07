@@ -3,7 +3,6 @@ package com.example.voltmart.model;
 import com.google.firebase.Timestamp;
 
 public class CartItemModel {
-
     String name, image;
     int productId, quantity;
     int price, originalPrice;
@@ -12,7 +11,7 @@ public class CartItemModel {
     public CartItemModel() {
     }
 
-    public CartItemModel(String name, String image, int productId, int quantity, int price, int originalPrice, Timestamp timestamp) {
+    public CartItemModel( int productId, String name, String image, int quantity, int price, int originalPrice, Timestamp timestamp) {
         this.name = name;
         this.image = image;
         this.productId = productId;
