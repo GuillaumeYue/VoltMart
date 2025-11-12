@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools" >
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -10,7 +10,28 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.VoltMart" >
+        android:theme="@style/Theme.VoltMart">
+        <activity
+            android:name=".activities.ModifyBannerActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activities.AddBannerActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activities.ModifyCategoryActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activities.AddCategoryActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activities.ModifyProductActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activities.AddProductActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activities.AdminActivity"
+            android:exported="false" />
         <activity
             android:name=".activities.CheckoutActivity"
             android:exported="false" />
@@ -25,7 +46,7 @@
             android:exported="false" />
         <activity
             android:name=".activities.MainActivity"
-            android:exported="true" >
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

@@ -1,5 +1,7 @@
 package com.example.voltmart.activities;
 
+import static io.reactivex.rxjava3.internal.util.EndConsumerHelper.validate;
+
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Patterns;
@@ -27,10 +29,10 @@ import com.google.firebase.auth.UserProfileChangeRequest;
 
 public class SignupActivity extends AppCompatActivity {
 
-    EditText nameEditText, emailEditText, passwordEditText;
+    ProgressBar progressBar;
+    EditText nameEditText, emailEditText, passEditText;
     ImageView nextBtn;
     TextView loginPageBtn;
-    ProgressBar progressBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,69 +43,51 @@ public class SignupActivity extends AppCompatActivity {
         progressBar = findViewById(R.id.progress_bar);
         nameEditText = findViewById(R.id.nameEditText);
         emailEditText = findViewById(R.id.emailEditText);
-        passwordEditText = findViewById(R.id.passwordEditText);
+        passEditText = findViewById(R.id.passEditText);
         nextBtn = findViewById(R.id.nextBtn);
         loginPageBtn = findViewById(R.id.loginPageBtn);
 
-        nextBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                createAccount();
-            }
-        });
+        nextBtn.setOnClickListener(v -> createAccount());
 
-        loginPageBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startActivity(new Intent(this, LoginActivity.class));
-                finish();
-            }
+        loginPageBtn.setOnClickListener(v -> {
+            startActivity(new Intent(this, LoginActivity.class));
+            finish();
         });
     }
 
     private void createAccount() {
-        String email = emailEditText.getText().toString().trim();
-        String password = passwordEditText.getText().toString().trim();
-
-        boolean isValid = validation(email, password);
-        if(!isValid)
+        String email = emailEditText.getText().toString();
+        String pass = passEditText.getText().toString();
+        boolean isValidated = validate(email, pass);
+        if (!isValidated)
             return;
 
-        createAccountInFirebase(email,password);
+        createAccountInFirebase(email,pass);
     }
 
-    private boolean validation(String email, String pass){
-        int flag = 0;
-        if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()){
-            emailEditText.setError("Email is invalid");
-            flag = 1;
-        }
-        if (pass.length() < 6){
-            passwordEditText.setError("Password must be of six characters");
-            flag = 1;
-        }
-        return flag == 0;
-    }
-
-    private void createAccountInFirebase(String email, String password) {
+    void createAccountInFirebase(String email, String pass) {
         changeInProgress(true);
 
         FirebaseAuth firebaseAuth = FirebaseAuth.getInstance();
-        firebaseAuth.createUserWithEmailAndPassword(email, password).addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
-            @Override
-            public void onComplete(@NonNull Task<AuthResult> task) {
-                changeInProgress(false);
-                if(task.isSuccessful()) {
-                    Toast.makeText(SignupActivity.this, "Check email to verify", Toast.LENGTH_SHORT).show();
-                    firebaseAuth.getCurrentUser().sendEmailVerification();
-                    FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-                    UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder().setDisplayName(nameEditText.getText().toString()).build();
-                    user.updateProfile(profileUpdates);
-                    firebaseAuth.signOut();
-                    finish();
-                }
-            }
-        });
+        firebaseAuth.createUserWithEmailAndPassword(email, pass).addOnCompleteListener(this,
+                new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        changeInProgress(false);
+                        if (task.isSuccessful()){
+                            Toast.makeText(SignupActivity.this, "Successfully created account, check email to verify", Toast.LENGTH_SHORT).show();
+                            firebaseAuth.getCurrentUser().sendEmailVerification();
+                            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+                            UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder().setDisplayName(nameEditText.getText().toString()).build();
+                            user.updateProfile(profileUpdates);
+                            firebaseAuth.signOut();
+                            finish();
+                        }
+                        else {
+                            Toast.makeText(SignupActivity.this, task.getException().getLocalizedMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
     }
 
     void changeInProgress(boolean inProgress){
@@ -114,6 +98,19 @@ public class SignupActivity extends AppCompatActivity {
             progressBar.setVisibility(View.GONE);
             nextBtn.setVisibility(View.VISIBLE);
         }
+    }
+
+    boolean validate(String email, String pass){
+        int flag=0;
+        if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()){
+            emailEditText.setError("Email is invalid");
+            flag=1;
+        }
+        if (pass.length() < 6){
+            passEditText.setError("Password must be of six characters");
+            flag=1;
+        }
+        return flag == 0;
     }
 
 }
