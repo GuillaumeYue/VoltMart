@@ -3,6 +3,7 @@ package com.example.voltmart.activities;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
@@ -35,12 +36,12 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.navigation.NavigationBarView;
 import com.google.firebase.dynamiclinks.FirebaseDynamicLinks;
 import com.google.firebase.dynamiclinks.PendingDynamicLinkData;
+import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.mancj.materialsearchbar.MaterialSearchBar;
 import com.mancj.materialsearchbar.SimpleOnSearchActionListener;
 
 public class MainActivity extends AppCompatActivity {
-
     BottomNavigationView bottomNavigationView;
     HomeFragment homeFragment;
     CartFragment cartFragment;
@@ -56,7 +57,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
 
         searchLinearLayout = findViewById(R.id.linearLayout);
@@ -69,6 +69,15 @@ public class MainActivity extends AppCompatActivity {
         searchFragment = new SearchFragment();
 
         bottomNavigationView = findViewById(R.id.bottom_navigation);
+        bottomNavigationView.setSelectedItemId(R.id.home);
+
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                addOrRemoveBadge();
+            }
+        }, 1000); // 延迟1秒执行
+
         bottomNavigationView.setOnItemSelectedListener(new NavigationBarView.OnItemSelectedListener() {
             @Override
             public boolean onNavigationItemSelected(@NonNull MenuItem item) {
@@ -112,24 +121,30 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        searchBar.setOnSearchActionListener(new SimpleOnSearchActionListener() {
-            @Override
-            public void onSearchStateChanged(boolean enabled) {
-                super.onSearchStateChanged(enabled);
-            }
+        try {
+            searchBar.setOnSearchActionListener(new SimpleOnSearchActionListener() {
+                @Override
+                public void onSearchStateChanged(boolean enabled) {
+                    super.onSearchStateChanged(enabled);
+                }
 
-            @Override
-            public void onSearchConfirmed(CharSequence text) {
-                if (!searchFragment.isAdded())
-                    getSupportFragmentManager().beginTransaction().replace(R.id.main_frame_layout, searchFragment, "search").addToBackStack(null).commit();
-                super.onSearchConfirmed(text);
-            }
+                @Override
+                public void onSearchConfirmed(CharSequence text) {
+                    if (!searchFragment.isAdded())
+                        getSupportFragmentManager().beginTransaction().replace(R.id.main_frame_layout, searchFragment, "search").addToBackStack(null).commit();
+                    super.onSearchConfirmed(text);
+                }
 
-            @Override
-            public void onButtonClicked(int buttonCode) {
-                super.onButtonClicked(buttonCode);
-            }
-        });
+                @Override
+                public void onButtonClicked(int buttonCode) {
+                    super.onButtonClicked(buttonCode);
+                }
+            });
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error initializing search bar", e);
+            // 如果搜索栏初始化失败，隐藏它
+            searchLinearLayout.setVisibility(View.GONE);
+        }
 
         handleDeepLink();
 
@@ -169,7 +184,30 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void addOrRemoveBadge() {
-        FirebaseUtil.getCartItems().get()
+        // 首先检查用户是否登录
+        if (!FirebaseUtil.isUserLoggedIn()) {
+            // 用户未登录，直接设置徽章为0
+            BadgeDrawable badge = bottomNavigationView.getOrCreateBadge(R.id.cart);
+            badge.setBackgroundColor(Color.parseColor("#FFF44336"));
+            badge.setVisible(false);
+            badge.clearNumber();
+            return;
+        }
+
+        // 获取购物车引用
+        CollectionReference cartRef = FirebaseUtil.getCartItems();
+
+        // 检查是否返回了虚拟集合（用户未登录但绕过检查的情况）
+        if (cartRef.getPath().contains("dummy_collection")) {
+            BadgeDrawable badge = bottomNavigationView.getOrCreateBadge(R.id.cart);
+            badge.setBackgroundColor(Color.parseColor("#FFF44336"));
+            badge.setVisible(false);
+            badge.clearNumber();
+            return;
+        }
+
+        // 用户已登录，正常查询购物车
+        cartRef.get()
                 .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<QuerySnapshot> task) {
@@ -184,6 +222,12 @@ public class MainActivity extends AppCompatActivity {
                                 badge.setVisible(false);
                                 badge.clearNumber();
                             }
+                        } else {
+                            // 查询失败，隐藏徽章
+                            Log.e("MainActivity", "Error getting cart items", task.getException());
+                            BadgeDrawable badge = bottomNavigationView.getOrCreateBadge(R.id.cart);
+                            badge.setVisible(false);
+                            badge.clearNumber();
                         }
                     }
                 });
