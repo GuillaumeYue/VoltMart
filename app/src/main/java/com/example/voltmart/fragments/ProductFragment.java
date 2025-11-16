@@ -165,8 +165,8 @@ public class ProductFragment extends Fragment {
         Picasso.get().load(currentProduct.getImage()).into(productImage);
         productName.setText(currentProduct.getName());
         int discountPerc = (currentProduct.getDiscount() * 100) / currentProduct.getOriginalPrice();
-        productPrice.setText("₹ " + currentProduct.getPrice());
-        originalPrice.setText("₹ " + currentProduct.getOriginalPrice());
+        productPrice.setText("$ " + currentProduct.getPrice());
+        originalPrice.setText("$ " + currentProduct.getOriginalPrice());
         originalPrice.setPaintFlags(originalPrice.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
         discountPercentage.setText(discountPerc + "% OFF");
 
@@ -211,20 +211,56 @@ public class ProductFragment extends Fragment {
                                             String docId = document.getId();
                                             int quantity = (int) (long) document.getData().get("quantity");
                                             if (quantity < stock) {
-                                                FirebaseUtil.getCartItems().document(docId).update("quantity", quantity + 1);
-                                                Toast.makeText(getActivity(), "Added to Cart", Toast.LENGTH_SHORT).show();
-                                                cartLottie.setVisibility(View.VISIBLE);
-                                                cartLottie.playAnimation();
+                                                FirebaseUtil.getCartItems().document(docId).update("quantity", quantity + 1)
+                                                        .addOnSuccessListener(aVoid -> {
+                                                            Toast.makeText(getActivity(), "Added to Cart", Toast.LENGTH_SHORT).show();
+                                                            cartLottie.setVisibility(View.VISIBLE);
+                                                            cartLottie.playAnimation();
+                                                            MainActivity activity = (MainActivity) getActivity();
+                                                            if (activity != null) {
+                                                                activity.addOrRemoveBadge();
+                                                            }
+                                                        })
+                                                        .addOnFailureListener(e -> {
+                                                            Log.e("ProductFragment", "Failed to update cart item quantity", e);
+                                                            Toast.makeText(getActivity(), "Failed to add to cart. Please try again.", Toast.LENGTH_SHORT).show();
+                                                        });
                                             } else
                                                 Toast.makeText(getActivity(), "Max stock available: " + stock, Toast.LENGTH_SHORT).show();
                                         }
                                         if (!documentExists) {
                                             if (stock >= 1) {
-                                                CartItemModel cartItem = new CartItemModel(currentProduct.getProductId(), currentProduct.getName(), currentProduct.getImage(), 1, currentProduct.getPrice(), currentProduct.getOriginalPrice(), Timestamp.now());
-                                                FirebaseUtil.getCartItems().add(cartItem);
-                                                cartLottie.setVisibility(View.VISIBLE);
-                                                cartLottie.playAnimation();
-                                                Toast.makeText(getContext(), "Added to Cart", Toast.LENGTH_SHORT).show();
+                                                // Validate product data before adding to cart
+                                                String productName = currentProduct.getName();
+                                                String productImage = currentProduct.getImage();
+                                                int productPrice = currentProduct.getPrice();
+                                                
+                                                if (productName == null || productName.trim().isEmpty() || productPrice < 0) {
+                                                    Log.e("ProductFragment", "Invalid product data - name: " + productName + ", image: " + productImage + ", price: " + productPrice);
+                                                    Toast.makeText(getActivity(), "Error: Product data is invalid. Please try again.", Toast.LENGTH_SHORT).show();
+                                                    return;
+                                                }
+                                                
+                                                // Use placeholder image if product image is null or empty
+                                                String cartImage = (productImage == null || productImage.trim().isEmpty()) 
+                                                        ? "https://via.placeholder.com/300" 
+                                                        : productImage;
+                                                
+                                                CartItemModel cartItem = new CartItemModel(currentProduct.getProductId(), currentProduct.getName(), cartImage, 1, currentProduct.getPrice(), currentProduct.getOriginalPrice(), Timestamp.now());
+                                                FirebaseUtil.getCartItems().add(cartItem)
+                                                        .addOnSuccessListener(aVoid -> {
+                                                            cartLottie.setVisibility(View.VISIBLE);
+                                                            cartLottie.playAnimation();
+                                                            Toast.makeText(getContext(), "Added to Cart", Toast.LENGTH_SHORT).show();
+                                                            MainActivity activity = (MainActivity) getContext();
+                                                            if (activity != null) {
+                                                                activity.addOrRemoveBadge();
+                                                            }
+                                                        })
+                                                        .addOnFailureListener(e -> {
+                                                            Log.e("ProductFragment", "Failed to add item to cart", e);
+                                                            Toast.makeText(getActivity(), "Failed to add to cart. Please try again.", Toast.LENGTH_SHORT).show();
+                                                        });
                                             } else
                                                 Toast.makeText(getActivity(), "Currently the item is out of stock :(", Toast.LENGTH_SHORT).show();
                                         }
@@ -234,8 +270,6 @@ public class ProductFragment extends Fragment {
                                                 cartLottie.setVisibility(View.GONE);
                                             }
                                         }, 2000);
-                                        MainActivity activity = (MainActivity) getContext();
-                                        activity.addOrRemoveBadge();
                                     }
                                 }
                             });

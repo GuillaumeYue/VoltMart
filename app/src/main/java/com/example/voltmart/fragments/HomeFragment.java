@@ -1,6 +1,7 @@
 package com.example.voltmart.fragments;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -108,6 +109,21 @@ public class HomeFragment extends Fragment {
     }
 
     private void initProducts() {
+        FirebaseUtil.getProducts()
+                .get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        int count = task.getResult().size();
+                        Log.d("HomeFragment", "Products count = " + count);
+
+                        // ✨ 关键三行：关 shimmer / 显示主内容
+                        shimmerFrameLayout.stopShimmer();
+                        shimmerFrameLayout.setVisibility(View.GONE);
+                        mainLinearLayout.setVisibility(View.VISIBLE);
+                    }
+
+                });
+
         Query query = FirebaseUtil.getProducts();
         FirestoreRecyclerOptions<ProductModel> options = new FirestoreRecyclerOptions.Builder<ProductModel>()
                 .setQuery(query, ProductModel.class)
@@ -118,4 +134,5 @@ public class HomeFragment extends Fragment {
         productRecyclerView.setAdapter(productAdapter);
         productAdapter.startListening();
     }
+
 }

@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Paint;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -40,9 +41,54 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
     boolean gotSum = false;
     int count;
 
+    // Callback interface for fragment communication
+    public interface CartAdapterListener {
+        void onCartEmpty();
+        void onCartHasItems();
+        void onItemsLoaded(); // Called when items finish loading (to stop shimmer)
+    }
+
+    private CartAdapterListener listener;
+
     @Override
     protected void onBindViewHolder(@NonNull CartViewHolder holder, int position, @NonNull CartItemModel model) {
-        activity.findViewById(R.id.emptyCartImageView).setVisibility(View.INVISIBLE);
+        // Validate position to prevent IndexOutOfBoundsException
+        if (position < 0 || position >= getItemCount()) {
+            Log.e("CartAdapter", "Invalid position: " + position + ", itemCount: " + getItemCount());
+            return;
+        }
+
+        // Check if model has valid data, if not, delete the invalid item
+        String itemName = model.getName();
+        String itemImage = model.getImage();
+        int itemPrice = model.getPrice();
+        int itemQuantity = model.getQuantity();
+        
+        if (itemName == null || itemName.trim().isEmpty() || 
+            itemPrice < 0 || itemQuantity <= 0) {
+            // Invalid cart item, delete it asynchronously to avoid RecyclerView inconsistency
+            try {
+                if (position >= 0 && position < getSnapshots().size()) {
+                    String docId = getSnapshots().getSnapshot(position).getId();
+                    Log.w("CartAdapter", "Deleting invalid cart item: " + docId);
+                    // Post deletion to avoid modifying data during binding
+                    holder.itemView.post(() -> {
+                        FirebaseUtil.getCartItems().document(docId).delete()
+                                .addOnSuccessListener(aVoid -> Log.i("CartAdapter", "Deleted invalid cart item: " + docId))
+                                .addOnFailureListener(e -> Log.e("CartAdapter", "Failed to delete invalid cart item: " + docId, e));
+                    });
+                }
+            } catch (Exception e) {
+                Log.e("CartAdapter", "Error deleting invalid cart item", e);
+            }
+            // Hide this view holder's item
+            holder.itemView.setVisibility(View.GONE);
+            return;
+        }
+
+        // Make sure the item is visible
+        holder.itemView.setVisibility(View.VISIBLE);
+
         if (position == 0 && !gotSum) {
             calculateTotalPrice();
         }
@@ -56,16 +102,23 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
         Picasso.get().load(model.getImage()).into(holder.productCartImage, new Callback() {
             @Override
             public void onSuccess() {
-                if (holder.getBindingAdapterPosition() == getSnapshots().size()-1) {
-                    ShimmerFrameLayout shimmerLayout = activity.findViewById(R.id.shimmerLayout);
-                    shimmerLayout.stopShimmer();
-                    shimmerLayout.setVisibility(View.GONE);
-                    activity.findViewById(R.id.mainLinearLayout).setVisibility(View.VISIBLE);
+                // When the last item's image loads, notify the fragment to stop shimmer
+                int position = holder.getBindingAdapterPosition();
+                if (position != RecyclerView.NO_POSITION && position == getSnapshots().size()-1) {
+                    if (listener != null) {
+                        listener.onItemsLoaded();
+                    }
                 }
             }
             @Override
             public void onError(Exception e) {
-
+                // Even on error, if this is the last item, stop shimmer
+                int position = holder.getBindingAdapterPosition();
+                if (position != RecyclerView.NO_POSITION && position == getSnapshots().size()-1) {
+                    if (listener != null) {
+                        listener.onItemsLoaded();
+                    }
+                }
             }
         });
 
@@ -104,6 +157,10 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
         count = options.getSnapshots().size();
         this.context = context;
     }
+
+    public void setCartAdapterListener(CartAdapterListener listener) {
+        this.listener = listener;
+    }
     private void changeQuantity(CartItemModel model, boolean plus) {
         FirebaseUtil.getProducts().whereEqualTo("productId", model.getProductId())
                 .get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
@@ -140,6 +197,10 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
                                                 .delete().addOnCompleteListener(new OnCompleteListener<Void>() {
                                                     @Override
                                                     public void onComplete(@NonNull Task<Void> task) {
+                                                        // Update badge when item is deleted
+                                                        if (context instanceof MainActivity) {
+                                                            ((MainActivity) context).addOrRemoveBadge();
+                                                        }
                                                     }
                                                 });
                                 }
@@ -158,19 +219,49 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
     @Override
     public void onDataChanged() {
         super.onDataChanged();
+        // Reset gotSum when data changes
+        gotSum = false;
+        totalPrice = 0;
+
+        // Update badge count when cart data changes
+        if (context instanceof MainActivity) {
+            ((MainActivity) context).addOrRemoveBadge();
+        }
+
         if (getItemCount() == 0){
-//            Toast.makeText(context, "True", Toast.LENGTH_SHORT).show();
-            Activity activity = (Activity) context;
-            ShimmerFrameLayout shimmerLayout = activity.findViewById(R.id.shimmerLayout);
-            shimmerLayout.stopShimmer();
-            shimmerLayout.setVisibility(View.GONE);
-            activity.findViewById(R.id.mainLinearLayout).setVisibility(View.VISIBLE);
-            activity.findViewById(R.id.emptyCartImageView).setVisibility(View.VISIBLE);
+            // Use callback if available, otherwise try to access views with null checks
+            if (listener != null) {
+                listener.onCartEmpty();
+            } else if (context instanceof Activity) {
+                Activity activity = (Activity) context;
+                ShimmerFrameLayout shimmerLayout = activity.findViewById(R.id.shimmerLayout);
+                if (shimmerLayout != null) {
+                    shimmerLayout.stopShimmer();
+                    shimmerLayout.setVisibility(View.GONE);
+                }
+                View mainLayout = activity.findViewById(R.id.mainLinearLayout);
+                if (mainLayout != null) {
+                    mainLayout.setVisibility(View.VISIBLE);
+                }
+                View emptyCartView = activity.findViewById(R.id.emptyCartImageView);
+                if (emptyCartView != null) {
+                    emptyCartView.setVisibility(View.VISIBLE);
+                }
+            }
         }
         else {
-//            Toast.makeText(context, "False", Toast.LENGTH_SHORT).show();
-            Activity activity = (Activity) context;
-            activity.findViewById(R.id.emptyCartImageView).setVisibility(View.INVISIBLE);
+            // Use callback if available, otherwise try to access views with null checks
+            if (listener != null) {
+                listener.onCartHasItems();
+                // Also notify that items are loaded to stop shimmer
+                listener.onItemsLoaded();
+            } else if (context instanceof Activity) {
+                Activity activity = (Activity) context;
+                View emptyCartView = activity.findViewById(R.id.emptyCartImageView);
+                if (emptyCartView != null) {
+                    emptyCartView.setVisibility(View.INVISIBLE);
+                }
+            }
         }
     }
 

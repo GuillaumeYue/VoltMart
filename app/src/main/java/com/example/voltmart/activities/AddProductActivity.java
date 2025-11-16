@@ -192,8 +192,8 @@ public class AddProductActivity extends AppCompatActivity {
 
         FirebaseDynamicLinks.getInstance().createDynamicLink()
                 .setLink(Uri.parse("https://www.example.com/?product_id=" + productId))
-                .setDomainUriPrefix("https://shopease.page.link")
-                .setAndroidParameters(new DynamicLink.AndroidParameters.Builder("com.example.newEcom").build())
+                .setDomainUriPrefix("https://voltmart.page.link")
+                .setAndroidParameters(new DynamicLink.AndroidParameters.Builder("com.example.voltmart").build())
                 .setSocialMetaTagParameters(new DynamicLink.SocialMetaTagParameters.Builder()
                         .setTitle(productName)
                         .setImageUrl(Uri.parse(productImage))

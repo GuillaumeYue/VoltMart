@@ -79,18 +79,52 @@ public class SearchAdapter extends FirestoreRecyclerAdapter<ProductModel, Search
                                             String docId = document.getId();
                                             int quantity = (int) (long) document.getData().get("quantity");
                                             if (quantity < stock) {
-                                                FirebaseUtil.getCartItems().document(docId).update("quantity", quantity + 1);
-                                                Toast.makeText(context, "Added to Cart", Toast.LENGTH_SHORT).show();
+                                                FirebaseUtil.getCartItems().document(docId).update("quantity", quantity + 1)
+                                                        .addOnSuccessListener(aVoid -> {
+                                                            Toast.makeText(context, "Added to Cart", Toast.LENGTH_SHORT).show();
+                                                            MainActivity activity = (MainActivity) context;
+                                                            if (activity != null) {
+                                                                activity.addOrRemoveBadge();
+                                                            }
+                                                        })
+                                                        .addOnFailureListener(e -> {
+                                                            android.util.Log.e("SearchAdapter", "Failed to update cart item quantity", e);
+                                                            Toast.makeText(context, "Failed to add to cart. Please try again.", Toast.LENGTH_SHORT).show();
+                                                        });
                                             } else
                                                 Toast.makeText(context, "Max stock available: " + stock, Toast.LENGTH_SHORT).show();
                                         }
                                         if (!documentExists) {
-                                            CartItemModel cartItem = new CartItemModel(product.getProductId(), product.getName(), product.getImage(), 1, product.getPrice(), product.getOriginalPrice(), Timestamp.now());
-                                            FirebaseUtil.getCartItems().add(cartItem);
-                                            Toast.makeText(context, "Added to Cart", Toast.LENGTH_SHORT).show();
+                                            // Validate product data before adding to cart
+                                            String productName = product.getName();
+                                            String productImage = product.getImage();
+                                            int productPrice = product.getPrice();
+                                            
+                                            if (productName == null || productName.trim().isEmpty() || productPrice < 0) {
+                                                android.util.Log.e("SearchAdapter", "Invalid product data - name: " + productName + ", image: " + productImage + ", price: " + productPrice);
+                                                Toast.makeText(context, "Error: Product data is invalid. Please try again.", Toast.LENGTH_SHORT).show();
+                                                return;
+                                            }
+                                            
+                                            // Use placeholder image if product image is null or empty
+                                            String cartImage = (productImage == null || productImage.trim().isEmpty()) 
+                                                    ? "https://via.placeholder.com/300" 
+                                                    : productImage;
+                                            
+                                            CartItemModel cartItem = new CartItemModel(product.getProductId(), product.getName(), cartImage, 1, product.getPrice(), product.getOriginalPrice(), Timestamp.now());
+                                            FirebaseUtil.getCartItems().add(cartItem)
+                                                    .addOnSuccessListener(aVoid -> {
+                                                        Toast.makeText(context, "Added to Cart", Toast.LENGTH_SHORT).show();
+                                                        MainActivity activity = (MainActivity) context;
+                                                        if (activity != null) {
+                                                            activity.addOrRemoveBadge();
+                                                        }
+                                                    })
+                                                    .addOnFailureListener(e -> {
+                                                        android.util.Log.e("SearchAdapter", "Failed to add item to cart", e);
+                                                        Toast.makeText(context, "Failed to add to cart. Please try again.", Toast.LENGTH_SHORT).show();
+                                                    });
                                         }
-                                        MainActivity activity = (MainActivity) context;
-                                        activity.addOrRemoveBadge();
                                     }
                                 }
                             });

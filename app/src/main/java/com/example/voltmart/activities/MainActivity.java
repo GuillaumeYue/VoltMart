@@ -89,23 +89,17 @@ public class MainActivity extends AppCompatActivity {
 //                    transaction.setCustomAnimations(R.anim.enter_from_right, R.anim.exit_to_left, R.anim.enter_from_left, R.anim.exit_to_right);
                     transaction.replace(R.id.main_frame_layout, homeFragment, "home");
                 } else if (item.getItemId() == R.id.cart) {
-                    if (!cartFragment.isAdded()) {
 //                        transaction.setCustomAnimations(R.anim.enter_from_right, R.anim.exit_to_left, R.anim.enter_from_left, R.anim.exit_to_right);
-                        transaction.replace(R.id.main_frame_layout, cartFragment, "cart");
-                        transaction.addToBackStack(null);
-                    }
+                    transaction.replace(R.id.main_frame_layout, cartFragment, "cart");
+                    // Don't add to back stack for main navigation tabs
                 } else if (item.getItemId() == R.id.wishlist) {
-                    if (!wishlistFragment.isAdded()) {
 //                        transaction.setCustomAnimations(R.anim.enter_from_right, R.anim.exit_to_left, R.anim.enter_from_left, R.anim.exit_to_right);
-                        transaction.replace(R.id.main_frame_layout, wishlistFragment, "wishlist");
-                        transaction.addToBackStack(null);
-                    }
+                    transaction.replace(R.id.main_frame_layout, wishlistFragment, "wishlist");
+                    // Don't add to back stack for main navigation tabs
                 } else if (item.getItemId() == R.id.profile) {
-                    if (!profileFragment.isAdded()) {
 //                        transaction.setCustomAnimations(R.anim.enter_from_right, R.anim.exit_to_left, R.anim.enter_from_left, R.anim.exit_to_right);
-                        transaction.replace(R.id.main_frame_layout, profileFragment, "profile");
-                        transaction.addToBackStack(null);
-                    }
+                    transaction.replace(R.id.main_frame_layout, profileFragment, "profile");
+                    // Don't add to back stack for main navigation tabs
                 }
                 transaction.commit();
                 return true;

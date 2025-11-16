@@ -183,13 +183,27 @@ public class CheckoutActivity extends AppCompatActivity {
         }
         Log.i("check 3",productDocId[0].size()+"");
 
-        for (String docId : cartDocument[0]){
-            FirebaseUtil.getCartItems().document(docId)
-                    .delete().addOnCompleteListener(new OnCompleteListener<Void>() {
-                        @Override
-                        public void onComplete(@NonNull Task<Void> task) {
-                        }
-                    });
+        // Delete cart items with proper error handling
+        int[] deletedCount = new int[1];
+        int totalCartItems = cartDocument[0].size();
+
+        if (totalCartItems == 0) {
+            Log.w("CheckoutActivity", "No cart items to delete");
+        } else {
+            for (String docId : cartDocument[0]){
+                FirebaseUtil.getCartItems().document(docId)
+                        .delete().addOnCompleteListener(new OnCompleteListener<Void>() {
+                            @Override
+                            public void onComplete(@NonNull Task<Void> task) {
+                                if (task.isSuccessful()) {
+                                    deletedCount[0]++;
+                                    Log.i("CheckoutActivity", "Cart item deleted: " + docId + " (" + deletedCount[0] + "/" + totalCartItems + ")");
+                                } else {
+                                    Log.e("CheckoutActivity", "Failed to delete cart item: " + docId, task.getException());
+                                }
+                            }
+                        });
+            }
         }
 
         String subject = "Your Order is successfully placed with VoltMart!";
@@ -236,6 +250,11 @@ public class CheckoutActivity extends AppCompatActivity {
         address = addressEditText.getText().toString();
         comment = commentEditText.getText().toString();
 
+        // Reset count for this checkout
+        count = 0;
+        adequateStock = true;
+        done = false;
+
         productDocId[0] = new ArrayList<>();
         oldStock[0] = new ArrayList<>();
         quan[0] = new ArrayList<>();
@@ -250,9 +269,21 @@ public class CheckoutActivity extends AppCompatActivity {
                 .addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                        prevOrderId[0] = (int) (long) task.getResult().get("lastOrderId");
-                        countOfOrderedItems[0] = (int) (long) task.getResult().get("countOfOrderedItems");
-                        priceOfOrders[0] = (int) (long) task.getResult().get("priceOfOrders");
+                        if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
+                            DocumentSnapshot document = task.getResult();
+                            Object lastOrderIdObj = document.get("lastOrderId");
+                            Object countOfOrderedItemsObj = document.get("countOfOrderedItems");
+                            Object priceOfOrdersObj = document.get("priceOfOrders");
+
+                            prevOrderId[0] = lastOrderIdObj != null ? (int) (long) lastOrderIdObj : 0;
+                            countOfOrderedItems[0] = countOfOrderedItemsObj != null ? (int) (long) countOfOrderedItemsObj : 0;
+                            priceOfOrders[0] = priceOfOrdersObj != null ? (int) (long) priceOfOrdersObj : 0;
+                        } else {
+                            // If document doesn't exist or task failed, use default values
+                            prevOrderId[0] = 0;
+                            countOfOrderedItems[0] = 0;
+                            priceOfOrders[0] = 0;
+                        }
                     }
                 });
 
@@ -262,22 +293,63 @@ public class CheckoutActivity extends AppCompatActivity {
                     public void onComplete(@NonNull Task<QuerySnapshot> task) {
                         if (task.isSuccessful()) {
                             for (QueryDocumentSnapshot document : task.getResult()) {
+                                // Add null checks for all document fields
+                                Object nameObj = document.get("name");
+                                Object imageObj = document.get("image");
+                                Object productIdObj = document.get("productId");
+                                Object priceObj = document.get("price");
+                                Object quantityObj = document.get("quantity");
+
+                                // Skip this document if any required field is null, and delete the invalid item
+                                if (nameObj == null || imageObj == null || productIdObj == null || priceObj == null || quantityObj == null) {
+                                    Log.e("CheckoutActivity", "Deleting invalid cart item with null fields: " + document.getId());
+                                    // Delete the invalid cart item
+                                    FirebaseUtil.getCartItems().document(document.getId()).delete()
+                                            .addOnSuccessListener(aVoid -> Log.i("CheckoutActivity", "Deleted invalid cart item: " + document.getId()))
+                                            .addOnFailureListener(e -> Log.e("CheckoutActivity", "Failed to delete invalid cart item: " + document.getId(), e));
+                                    continue;
+                                }
+
                                 count++;
                                 cartDocument[0].add(document.getId());
-                                productName[0].add(document.get("name").toString());
-                                productPrice[0].add((int) (long) document.get("price"));
-                                productQuantity[0].add((int) (long) document.get("quantity"));
+                                productName[0].add(nameObj.toString());
+                                productPrice[0].add((int) (long) priceObj);
+                                productQuantity[0].add((int) (long) quantityObj);
 
-                                OrderItemModel item = new OrderItemModel(prevOrderId[0] + 1, (int) (long) document.get("productId"), document.get("name").toString(), document.get("image").toString(),
-                                        (int) (long) document.get("price"), (int) (long) document.get("quantity"), Timestamp.now(), name, email, phone, address, comment);
+                                OrderItemModel item = new OrderItemModel(prevOrderId[0] + 1, (int) (long) productIdObj, nameObj.toString(), imageObj.toString(),
+                                        (int) (long) priceObj, (int) (long) quantityObj, Timestamp.now(), name, email, phone, address, comment);
 
-                                FirebaseFirestore.getInstance().collection("orders").document(FirebaseAuth.getInstance().getUid()).collection("items").add(item);
-                                int quantity = (int) (long) document.get("quantity");
+                                // Create order with error handling
+                                FirebaseFirestore.getInstance().collection("orders").document(FirebaseAuth.getInstance().getUid()).collection("items").add(item)
+                                        .addOnSuccessListener(documentReference -> {
+                                            Log.i("CheckoutActivity", "Order item created successfully: " + documentReference.getId());
+                                        })
+                                        .addOnFailureListener(e -> {
+                                            Log.e("CheckoutActivity", "Failed to create order item", e);
+                                        });
+                                int quantity = (int) (long) quantityObj;
 
                                 callback.onCallback(document, quantity);
 
                             }
-                            Log.i("check0", done + "");
+
+                            // Check if we have any items to process
+                            if (count == 0) {
+                                Log.e("CheckoutActivity", "No cart items found to process");
+                                dialog.dismiss();
+                                new SweetAlertDialog(CheckoutActivity.this, SweetAlertDialog.ERROR_TYPE)
+                                        .setTitleText("Order Failed!")
+                                        .setContentText("Your cart is empty. Please add items to your cart before checkout.")
+                                        .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
+                                            @Override
+                                            public void onClick(SweetAlertDialog sweetAlertDialog) {
+                                                finish();
+                                            }
+                                        }).show();
+                                return;
+                            }
+
+                            Log.i("check0", "Processing " + count + " items, done: " + done);
 
                             dialog.show();
                             new Handler().postDelayed(new Runnable() {
