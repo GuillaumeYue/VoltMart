@@ -97,15 +97,91 @@ public class HomeFragment extends Fragment {
     }
 
     private void initCategories() {
+        // First check if categories exist
+        FirebaseUtil.getCategories().get()
+                .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                    @Override
+                    public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                        if (task.isSuccessful() && task.getResult() != null) {
+                            int categoryCount = task.getResult().size();
+                            Log.d("HomeFragment", "Categories count = " + categoryCount);
+                            
+                            if (categoryCount == 0) {
+                                Log.w("HomeFragment", "No categories found in database");
+                            } else {
+                                Log.d("HomeFragment", "Categories found, should be displaying");
+                                // Make sure main layout is visible when categories load
+                                if (mainLinearLayout != null && mainLinearLayout.getVisibility() != View.VISIBLE) {
+                                    shimmerFrameLayout.stopShimmer();
+                                    shimmerFrameLayout.setVisibility(View.GONE);
+                                    mainLinearLayout.setVisibility(View.VISIBLE);
+                                    Log.d("HomeFragment", "Made mainLinearLayout visible after categories loaded");
+                                    
+                                    // Force RecyclerView to layout after parent becomes visible
+                                    if (categoryRecyclerView != null) {
+                                        categoryRecyclerView.post(() -> {
+                                            categoryRecyclerView.requestLayout();
+                                            categoryRecyclerView.invalidate();
+                                            Log.d("HomeFragment", "Requested layout for categoryRecyclerView after parent became visible");
+                                        });
+                                    }
+                                }
+                            }
+                        } else {
+                            Log.e("HomeFragment", "Error loading categories", task.getException());
+                        }
+                    }
+                });
+        
         Query query = FirebaseUtil.getCategories();
         FirestoreRecyclerOptions<CategoryModel> options = new FirestoreRecyclerOptions.Builder<CategoryModel>()
                 .setQuery(query, CategoryModel.class)
                 .build();
 
         categoryAdapter = new CategoryAdapter(options, getContext());
-        categoryRecyclerView.setLayoutManager(new GridLayoutManager(getContext(), 4));
+        
+        // Set up RecyclerView - For NestedScrollView, we need to disable nested scrolling
+        GridLayoutManager layoutManager = new GridLayoutManager(getContext(), 4);
+        categoryRecyclerView.setLayoutManager(layoutManager);
+        categoryRecyclerView.setHasFixedSize(false); // Must be false for wrap_content in NestedScrollView
+        categoryRecyclerView.setNestedScrollingEnabled(false); // Critical for NestedScrollView
+        
+        // Ensure RecyclerView is visible
+        categoryRecyclerView.setVisibility(View.VISIBLE);
         categoryRecyclerView.setAdapter(categoryAdapter);
+        
+        Log.d("HomeFragment", "Category adapter created, starting to listen");
+        Log.d("HomeFragment", "RecyclerView visibility: " + (categoryRecyclerView.getVisibility() == View.VISIBLE ? "VISIBLE" : "NOT VISIBLE"));
+        Log.d("HomeFragment", "RecyclerView adapter: " + (categoryRecyclerView.getAdapter() != null ? "SET" : "NULL"));
+        
         categoryAdapter.startListening();
+        
+        // Wait for data to load, then force layout
+        categoryRecyclerView.postDelayed(() -> {
+            if (categoryAdapter != null && categoryAdapter.getItemCount() > 0) {
+                Log.d("HomeFragment", "Category adapter itemCount: " + categoryAdapter.getItemCount());
+                Log.d("HomeFragment", "RecyclerView measured width: " + categoryRecyclerView.getMeasuredWidth() + ", height: " + categoryRecyclerView.getMeasuredHeight());
+                
+                // Force RecyclerView to measure and layout
+                categoryRecyclerView.measure(
+                    View.MeasureSpec.makeMeasureSpec(categoryRecyclerView.getWidth(), View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                );
+                categoryRecyclerView.requestLayout();
+                
+                // Check child count after layout
+                categoryRecyclerView.post(() -> {
+                    int childCount = categoryRecyclerView.getChildCount();
+                    Log.d("HomeFragment", "RecyclerView child count after layout: " + childCount);
+                    if (childCount == 0) {
+                        Log.e("HomeFragment", "CRITICAL: RecyclerView has NO children despite " + categoryAdapter.getItemCount() + " items!");
+                        // Try invalidating and requesting layout again
+                        categoryRecyclerView.invalidate();
+                        categoryRecyclerView.requestLayout();
+                    }
+                });
+            }
+        }, 1000);
     }
 
     private void initProducts() {

@@ -28,8 +28,14 @@ import com.google.android.gms.tasks.Task;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
+import com.google.firebase.firestore.SetOptions;
 import com.squareup.picasso.Callback;
 import com.squareup.picasso.Picasso;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import cn.pedant.SweetAlert.SweetAlertDialog;
 
@@ -42,7 +48,7 @@ public class AddCategoryActivity extends AppCompatActivity {
 
     String categoryImage;
     String productName;
-    int categoryId;
+    int categoryId = 1; // Initialize with default value
     Context context = this;
     boolean imageUploaded = false;
 
@@ -65,14 +71,69 @@ public class AddCategoryActivity extends AppCompatActivity {
         backBtn = findViewById(R.id.backBtn);
         removeImageBtn = findViewById(R.id.removeImageBtn);
 
-        FirebaseUtil.getDetails().get()
-                .addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+        // Clear all fields to remove previous data
+        clearFields();
+
+        // Set initial categoryId value immediately
+        idEditText.setText(categoryId + "");
+
+        // First, check actual categories in database to find the highest ID
+        // Use an array to hold the value so it can be modified in inner classes
+        final int[] maxCategoryId = {0};
+        
+        FirebaseUtil.getCategories().get()
+                .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                     @Override
-                    public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                        if (task.isSuccessful()) {
-                            categoryId = Integer.parseInt(task.getResult().get("lastCategoryId").toString()) + 1;
-                            idEditText.setText(categoryId+ "");
+                    public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                        if (task.isSuccessful() && task.getResult() != null) {
+                            for (QueryDocumentSnapshot document : task.getResult()) {
+                                try {
+                                    CategoryModel category = document.toObject(CategoryModel.class);
+                                    if (category != null && category.getCategoryId() > maxCategoryId[0]) {
+                                        maxCategoryId[0] = category.getCategoryId();
+                                    }
+                                } catch (Exception e) {
+                                    android.util.Log.e("AddCategoryActivity", "Error parsing category", e);
+                                }
+                            }
                         }
+                        
+                        // If no categories exist in database, start from 1
+                        if (maxCategoryId[0] == 0) {
+                            categoryId = 1;
+                            idEditText.setText(categoryId + "");
+                            return;
+                        }
+                        
+                        // Use the higher value between maxCategoryId from database and lastCategoryId from details
+                        FirebaseUtil.getDetails().get()
+                                .addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+                                    @Override
+                                    public void onComplete(@NonNull Task<DocumentSnapshot> task) {
+                                        // Use the maximum from database as base (since we know categories exist)
+                                        int lastCategoryId = maxCategoryId[0];
+                                        
+                                        if (task.isSuccessful() && task.getResult() != null) {
+                                            DocumentSnapshot document = task.getResult();
+                                            Object lastCategoryIdObj = document.get("lastCategoryId");
+                                            if (lastCategoryIdObj != null) {
+                                                try {
+                                                    int detailsCategoryId = Integer.parseInt(lastCategoryIdObj.toString());
+                                                    // Use the maximum of both values, but prioritize actual database value
+                                                    lastCategoryId = Math.max(maxCategoryId[0], detailsCategoryId);
+                                                } catch (NumberFormatException e) {
+                                                    android.util.Log.e("AddCategoryActivity", "Error parsing lastCategoryId", e);
+                                                    // If parsing fails, use the database value
+                                                    lastCategoryId = maxCategoryId[0];
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Set categoryId to the next available ID
+                                        categoryId = lastCategoryId + 1;
+                                        idEditText.setText(categoryId + "");
+                                    }
+                                });
                     }
                 });
 
@@ -116,12 +177,20 @@ public class AddCategoryActivity extends AppCompatActivity {
                 .addOnSuccessListener(new OnSuccessListener<DocumentReference>() {
                     @Override
                     public void onSuccess(DocumentReference documentReference) {
-                        FirebaseUtil.getDetails().update("lastCategoryId", categoryId)
+                        // Use set with merge to create document if it doesn't exist
+                        Map<String, Object> detailsMap = new HashMap<>();
+                        detailsMap.put("lastCategoryId", categoryId);
+                        FirebaseUtil.getDetails().set(detailsMap, SetOptions.merge())
                                 .addOnCompleteListener(new OnCompleteListener<Void>() {
                                     @Override
                                     public void onComplete(@NonNull Task<Void> task) {
                                         if (task.isSuccessful()) {
                                             Toast.makeText(AddCategoryActivity.this, "Category has been added successfully!", Toast.LENGTH_SHORT).show();
+                                            finish();
+                                        } else {
+                                            // Even if updating details fails, category was added successfully
+                                            Toast.makeText(AddCategoryActivity.this, "Category has been added successfully!", Toast.LENGTH_SHORT).show();
+                                            android.util.Log.e("AddCategoryActivity", "Failed to update lastCategoryId", task.getException());
                                             finish();
                                         }
                                     }
@@ -141,12 +210,17 @@ public class AddCategoryActivity extends AppCompatActivity {
                 .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
                     @Override
                     public void onClick(SweetAlertDialog sweetAlertDialog) {
+                        // Only delete image if categoryId is set and image was uploaded
+                        if (categoryId > 0 && imageUploaded && categoryImage != null) {
+                            FirebaseUtil.getCategoryImageReference(categoryId + "").delete();
+                        }
+                        
                         imageUploaded = false;
                         categoryImageView.setImageDrawable(null);
                         categoryImageView.setVisibility(View.GONE);
                         removeImageBtn.setVisibility(View.GONE);
-
-                        FirebaseUtil.getCategoryImageReference(categoryId + "").delete();
+                        categoryImage = null;
+                        
                         alertDialog.dismiss();
                     }
                 }).show();
@@ -166,11 +240,11 @@ public class AddCategoryActivity extends AppCompatActivity {
             descEditText.setError("Description is required");
             isValid = false;
         }
-        if (colorEditText.getText().toString().trim().length() == 0) {
+        String colorText = colorEditText.getText().toString().trim();
+        if (colorText.length() == 0) {
             colorEditText.setError("Color is required");
             isValid = false;
-        }
-        if (colorEditText.getText().toString().charAt(0) != '#') {
+        } else if (colorText.charAt(0) != '#') {
             colorEditText.setError("Color should be HEX value");
             isValid = false;
         }
@@ -223,8 +297,25 @@ public class AddCategoryActivity extends AppCompatActivity {
         }
     }
 
+    private void clearFields() {
+        // Clear all text fields
+        nameEditText.setText("");
+        descEditText.setText("");
+        colorEditText.setText("");
+        
+        // Clear image
+        categoryImageView.setImageDrawable(null);
+        categoryImageView.setVisibility(View.GONE);
+        removeImageBtn.setVisibility(View.GONE);
+        categoryImage = null;
+        imageUploaded = false;
+    }
+
     public void onBackPressed() {
         super.onBackPressed();
-        FirebaseUtil.getCategoryImageReference(categoryId + "").delete();
+        // Only delete image if one was uploaded
+        if (imageUploaded && categoryId > 0) {
+            FirebaseUtil.getCategoryImageReference(categoryId + "").delete();
+        }
     }
 }

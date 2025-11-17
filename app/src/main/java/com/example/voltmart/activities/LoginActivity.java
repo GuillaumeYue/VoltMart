@@ -1,6 +1,5 @@
 package com.example.voltmart.activities;
 
-import android.app.Activity;
 import android.app.ActivityOptions;
 import android.content.Intent;
 import android.os.Bundle;
@@ -45,7 +44,6 @@ public class LoginActivity extends AppCompatActivity {
 
     FirebaseAuth firebaseAuth;
     GoogleSignInClient googleSignInClient;
-    Activity activity;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -108,7 +106,7 @@ public class LoginActivity extends AppCompatActivity {
                 if (task.isSuccessful()){
                     if (firebaseAuth.getCurrentUser().isEmailVerified()){
                         if (firebaseAuth.getCurrentUser().getEmail().equals("alexyuehan@gmail.com"))
-                            startActivity(new Intent(LoginActivity.this, AdminActivity.class), ActivityOptions.makeSceneTransitionAnimation(activity).toBundle());
+                            startActivity(new Intent(LoginActivity.this, AdminActivity.class), ActivityOptions.makeSceneTransitionAnimation(LoginActivity.this).toBundle());
                         else
                             startActivity(new Intent(LoginActivity.this, MainActivity.class));
                         finish();

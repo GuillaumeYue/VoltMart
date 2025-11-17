@@ -53,9 +53,24 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
     @Override
     protected void onBindViewHolder(@NonNull CartViewHolder holder, int position, @NonNull CartItemModel model) {
         // Validate position to prevent IndexOutOfBoundsException
-        if (position < 0 || position >= getItemCount()) {
-            Log.e("CartAdapter", "Invalid position: " + position + ", itemCount: " + getItemCount());
+        // Check both getItemCount() and getSnapshots().size() for extra safety
+        int itemCount = getItemCount();
+        int snapshotSize = getSnapshots().size();
+        
+        if (position < 0 || position >= itemCount || position >= snapshotSize) {
+            Log.e("CartAdapter", "Invalid position: " + position + ", itemCount: " + itemCount + ", snapshotSize: " + snapshotSize);
+            // Hide the view holder to prevent crashes
+            holder.itemView.setVisibility(View.GONE);
+            holder.itemView.setLayoutParams(new RecyclerView.LayoutParams(0, 0));
             return;
+        }
+
+        // Ensure the view is visible and has proper layout params
+        holder.itemView.setVisibility(View.VISIBLE);
+        if (holder.itemView.getLayoutParams() != null && holder.itemView.getLayoutParams().height == 0) {
+            holder.itemView.setLayoutParams(new RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT));
         }
 
         // Check if model has valid data, if not, delete the invalid item
@@ -86,19 +101,24 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
             return;
         }
 
-        // Make sure the item is visible
-        holder.itemView.setVisibility(View.VISIBLE);
-
         if (position == 0 && !gotSum) {
             calculateTotalPrice();
         }
 
-        holder.productName.setText(model.getName());
-        holder.singleProductPrice.setText("$ " + model.getPrice());
-        holder.productPrice.setText("$ " + model.getPrice() * model.getQuantity());
-        holder.originalPrice.setText("$ " + model.getOriginalPrice());
-        holder.originalPrice.setPaintFlags(holder.originalPrice.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
-        holder.productQuantity.setText(model.getQuantity() + "");
+        // Safely bind data with try-catch to prevent crashes during rapid data changes
+        try {
+            holder.productName.setText(model.getName());
+            holder.singleProductPrice.setText("$ " + model.getPrice());
+            holder.productPrice.setText("$ " + model.getPrice() * model.getQuantity());
+            holder.originalPrice.setText("$ " + model.getOriginalPrice());
+            holder.originalPrice.setPaintFlags(holder.originalPrice.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
+            holder.productQuantity.setText(model.getQuantity() + "");
+        } catch (Exception e) {
+            Log.e("CartAdapter", "Error binding cart item data at position " + position, e);
+            holder.itemView.setVisibility(View.GONE);
+            return;
+        }
+        
         Picasso.get().load(model.getImage()).into(holder.productCartImage, new Callback() {
             @Override
             public void onSuccess() {
@@ -123,10 +143,32 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
         });
 
         holder.plusBtn.setOnClickListener(v -> {
-            changeQuantity(model, true);
+            // Disable button temporarily to prevent rapid clicks
+            holder.plusBtn.setEnabled(false);
+            holder.minusBtn.setEnabled(false);
+            // Post to next frame to ensure RecyclerView has finished current layout
+            holder.itemView.post(() -> {
+                changeQuantity(model, true);
+                // Re-enable buttons after a short delay
+                holder.itemView.postDelayed(() -> {
+                    holder.plusBtn.setEnabled(true);
+                    holder.minusBtn.setEnabled(true);
+                }, 300);
+            });
         });
         holder.minusBtn.setOnClickListener(v -> {
-            changeQuantity(model, false);
+            // Disable button temporarily to prevent rapid clicks
+            holder.plusBtn.setEnabled(false);
+            holder.minusBtn.setEnabled(false);
+            // Post to next frame to ensure RecyclerView has finished current layout
+            holder.itemView.post(() -> {
+                changeQuantity(model, false);
+                // Re-enable buttons after a short delay
+                holder.itemView.postDelayed(() -> {
+                    holder.plusBtn.setEnabled(true);
+                    holder.minusBtn.setEnabled(true);
+                }, 300);
+            });
         });
     }
 
@@ -156,19 +198,50 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
         super(options);
         count = options.getSnapshots().size();
         this.context = context;
+        // Enable stable IDs to help RecyclerView track items during rapid changes
+        setHasStableIds(true);
+    }
+
+    @Override
+    public long getItemId(int position) {
+        // Provide stable IDs based on document ID to help RecyclerView track items
+        // This prevents crashes when items are deleted during checkout
+        try {
+            if (position >= 0 && position < getSnapshots().size()) {
+                String docId = getSnapshots().getSnapshot(position).getId();
+                return docId.hashCode();
+            }
+        } catch (Exception e) {
+            Log.e("CartAdapter", "Error getting item ID at position " + position, e);
+        }
+        return super.getItemId(position);
     }
 
     public void setCartAdapterListener(CartAdapterListener listener) {
         this.listener = listener;
     }
     private void changeQuantity(CartItemModel model, boolean plus) {
+        // Validate model to prevent crashes
+        if (model == null || model.getProductId() <= 0) {
+            Log.e("CartAdapter", "Invalid model in changeQuantity");
+            return;
+        }
+
         FirebaseUtil.getProducts().whereEqualTo("productId", model.getProductId())
                 .get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                        if (task.isSuccessful()) {
+                        if (task.isSuccessful() && task.getResult() != null) {
                             for (QueryDocumentSnapshot document : task.getResult()) {
-                                stock[0] = (int) (long) document.getData().get("stock");
+                                try {
+                                    Object stockObj = document.getData().get("stock");
+                                    if (stockObj != null) {
+                                        stock[0] = (int) (long) stockObj;
+                                    }
+                                } catch (Exception e) {
+                                    Log.e("CartAdapter", "Error getting stock", e);
+                                    stock[0] = 0;
+                                }
                             }
                         }
                     }
@@ -178,39 +251,70 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
                 .get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                        if (task.isSuccessful()) {
+                        if (task.isSuccessful() && task.getResult() != null) {
                             for (QueryDocumentSnapshot document : task.getResult()) {
-                                String docId = document.getId();
-                                int quantity = (int) (long) document.getData().get("quantity");
-                                if (plus) {
-                                    if (quantity < stock[0]) {
-                                        FirebaseUtil.getCartItems().document(docId).update("quantity", quantity + 1);
-                                        totalPrice += model.getPrice();
-                                    } else
-                                        Toast.makeText(context, "Max stock available: " + stock[0], Toast.LENGTH_SHORT).show();
-                                } else {
-                                    totalPrice -= model.getPrice();
-                                    if (quantity > 1)
-                                        FirebaseUtil.getCartItems().document(docId).update("quantity", quantity - 1);
-                                    else
-                                        FirebaseUtil.getCartItems().document(docId)
-                                                .delete().addOnCompleteListener(new OnCompleteListener<Void>() {
-                                                    @Override
-                                                    public void onComplete(@NonNull Task<Void> task) {
-                                                        // Update badge when item is deleted
-                                                        if (context instanceof MainActivity) {
-                                                            ((MainActivity) context).addOrRemoveBadge();
+                                try {
+                                    String docId = document.getId();
+                                    Object quantityObj = document.getData().get("quantity");
+                                    if (quantityObj == null) {
+                                        Log.e("CartAdapter", "Quantity is null for document: " + docId);
+                                        continue;
+                                    }
+                                    
+                                    int quantity = (int) (long) quantityObj;
+                                    
+                                    if (plus) {
+                                        if (quantity < stock[0]) {
+                                            // Update quantity - Firestore will trigger adapter update
+                                            FirebaseUtil.getCartItems().document(docId).update("quantity", quantity + 1)
+                                                    .addOnFailureListener(e -> {
+                                                        Log.e("CartAdapter", "Failed to update quantity", e);
+                                                        Toast.makeText(context, "Failed to update quantity", Toast.LENGTH_SHORT).show();
+                                                    });
+                                            totalPrice += model.getPrice();
+                                        } else {
+                                            Toast.makeText(context, "Max stock available: " + stock[0], Toast.LENGTH_SHORT).show();
+                                        }
+                                    } else {
+                                        totalPrice -= model.getPrice();
+                                        if (quantity > 1) {
+                                            // Update quantity - Firestore will trigger adapter update
+                                            FirebaseUtil.getCartItems().document(docId).update("quantity", quantity - 1)
+                                                    .addOnFailureListener(e -> {
+                                                        Log.e("CartAdapter", "Failed to update quantity", e);
+                                                        Toast.makeText(context, "Failed to update quantity", Toast.LENGTH_SHORT).show();
+                                                    });
+                                        } else {
+                                            // Delete item - Firestore will trigger adapter update
+                                            FirebaseUtil.getCartItems().document(docId)
+                                                    .delete().addOnCompleteListener(new OnCompleteListener<Void>() {
+                                                        @Override
+                                                        public void onComplete(@NonNull Task<Void> task) {
+                                                            // Update badge when item is deleted
+                                                            if (context instanceof MainActivity) {
+                                                                ((MainActivity) context).addOrRemoveBadge();
+                                                            }
                                                         }
-                                                    }
-                                                });
-                                }
-                                MainActivity activity = (MainActivity) context;
-                                activity.addOrRemoveBadge();
+                                                    });
+                                        }
+                                    }
+                                    
+                                    if (context instanceof MainActivity) {
+                                        MainActivity activity = (MainActivity) context;
+                                        activity.addOrRemoveBadge();
 
-                                Intent intent = new Intent("price");
-                                intent.putExtra("totalPrice", totalPrice);
-                                LocalBroadcastManager.getInstance(context).sendBroadcast(intent);
+                                        Intent intent = new Intent("price");
+                                        intent.putExtra("totalPrice", totalPrice);
+                                        LocalBroadcastManager.getInstance(context).sendBroadcast(intent);
+                                    }
+                                } catch (Exception e) {
+                                    Log.e("CartAdapter", "Error updating quantity", e);
+                                    Toast.makeText(context, "Error updating quantity", Toast.LENGTH_SHORT).show();
+                                }
                             }
+                        } else {
+                            Log.e("CartAdapter", "Failed to get cart items", task.getException());
+                            Toast.makeText(context, "Failed to update cart", Toast.LENGTH_SHORT).show();
                         }
                     }
                 });

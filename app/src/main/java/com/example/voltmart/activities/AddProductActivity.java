@@ -37,11 +37,14 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
+import com.google.firebase.firestore.SetOptions;
 import com.squareup.picasso.Callback;
 import com.squareup.picasso.Picasso;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import cn.pedant.SweetAlert.SweetAlertDialog;
 
@@ -57,7 +60,7 @@ public class AddProductActivity extends AppCompatActivity {
     String[] categories;
     String category, productImage, shareLink;
     String productName;
-    int productId;
+    int productId = 1; // Initialize with default value
     Context context = this;
     boolean imageUploaded = false;
 
@@ -86,12 +89,33 @@ public class AddProductActivity extends AppCompatActivity {
         backBtn = findViewById(R.id.backBtn);
         removeImageBtn = findViewById(R.id.removeImageBtn);
 
+        // Set initial productId value immediately
+        idEditText.setText(productId + "");
+
         FirebaseUtil.getDetails().get()
                 .addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                        if (task.isSuccessful()) {
-                            productId = Integer.parseInt(task.getResult().get("lastProductId").toString()) + 1;
+                        if (task.isSuccessful() && task.getResult() != null) {
+                            DocumentSnapshot document = task.getResult();
+                            Object lastProductIdObj = document.get("lastProductId");
+                            if (lastProductIdObj != null) {
+                                try {
+                                    productId = Integer.parseInt(lastProductIdObj.toString()) + 1;
+                                    idEditText.setText(productId + "");
+                                } catch (NumberFormatException e) {
+                                    Log.e("AddProductActivity", "Error parsing lastProductId", e);
+                                    productId = 1; // Default to 1 if parsing fails
+                                    idEditText.setText(productId + "");
+                                }
+                            } else {
+                                // If lastProductId doesn't exist, start from 1
+                                productId = 1;
+                                idEditText.setText(productId + "");
+                            }
+                        } else {
+                            // If document doesn't exist or task failed, start from 1
+                            productId = 1;
                             idEditText.setText(productId + "");
                         }
                     }
@@ -160,10 +184,59 @@ public class AddProductActivity extends AppCompatActivity {
         List<String> sk = Arrays.asList(productName.trim().toLowerCase().split(" "));
         String desc = descEditText.getText().toString();
         String spec = specEditText.getText().toString();
-        int price = Integer.parseInt(priceEditText.getText().toString());
-        int discount = Integer.parseInt(discountEditText.getText().toString());
-        int stock = Integer.parseInt(stockEditText.getText().toString());
-//        productId = Integer.parseInt(idEditText.getText().toString());
+        
+        // Validate and parse price
+        String priceStr = priceEditText.getText().toString().trim();
+        if (priceStr.isEmpty()) {
+            Toast.makeText(this, "Price is required", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int price;
+        try {
+            price = Integer.parseInt(priceStr);
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "Invalid price value", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // Validate and parse discount
+        String discountStr = discountEditText.getText().toString().trim();
+        if (discountStr.isEmpty()) {
+            Toast.makeText(this, "Discount is required", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int discount;
+        try {
+            discount = Integer.parseInt(discountStr);
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "Invalid discount value", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // Validate and parse stock
+        String stockStr = stockEditText.getText().toString().trim();
+        if (stockStr.isEmpty()) {
+            Toast.makeText(this, "Stock is required", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int stock;
+        try {
+            stock = Integer.parseInt(stockStr);
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "Invalid stock value", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // Get productId from idEditText if available, otherwise use the initialized value
+        String idStr = idEditText.getText().toString().trim();
+        if (!idStr.isEmpty()) {
+            try {
+                productId = Integer.parseInt(idStr);
+            } catch (NumberFormatException e) {
+                Log.e("AddProductActivity", "Error parsing productId from EditText", e);
+                // Keep the existing productId value
+            }
+        }
 
         ProductModel model = new ProductModel(productName, sk, productImage, category, desc, spec, price, discount, price - discount, productId, stock, shareLink, 0f, 0);
 //        Log.i("Link2", shareLink);
@@ -171,12 +244,20 @@ public class AddProductActivity extends AppCompatActivity {
                 .addOnSuccessListener(new OnSuccessListener<DocumentReference>() {
                     @Override
                     public void onSuccess(DocumentReference documentReference) {
-                        FirebaseUtil.getDetails().update("lastProductId", productId)
+                        // Use set with merge to create document if it doesn't exist
+                        Map<String, Object> detailsMap = new HashMap<>();
+                        detailsMap.put("lastProductId", productId);
+                        FirebaseUtil.getDetails().set(detailsMap, SetOptions.merge())
                                 .addOnCompleteListener(new OnCompleteListener<Void>() {
                                     @Override
                                     public void onComplete(@NonNull Task<Void> task) {
                                         if (task.isSuccessful()) {
                                             Toast.makeText(AddProductActivity.this, "Product has been added successfully!", Toast.LENGTH_SHORT).show();
+                                            finish();
+                                        } else {
+                                            // Even if updating details fails, product was added successfully
+                                            Toast.makeText(AddProductActivity.this, "Product has been added successfully!", Toast.LENGTH_SHORT).show();
+                                            Log.e("AddProductActivity", "Failed to update lastProductId", task.getException());
                                             finish();
                                         }
                                     }
@@ -209,11 +290,15 @@ public class AddProductActivity extends AppCompatActivity {
 
                             addToFirebase();
                         } else {
+                            // If dynamic link generation fails, still add the product with a fallback link
                             Exception exception = task.getException();
                             if (exception != null) {
                                 exception.printStackTrace();
                             }
-                            Log.i("Error", "There is some error");
+                            Log.w("AddProductActivity", "Dynamic link generation failed, adding product with fallback link", exception);
+                            // Use a fallback share link
+                            shareLink = "https://www.example.com/?product_id=" + productId;
+                            addToFirebase();
                         }
                     }
                 });

@@ -149,20 +149,49 @@ public class ModifyProductActivity extends AppCompatActivity {
     private void initDropDown(MyCallback myCallback) {
         int size[] = new int[1];
 
+        // Try to load products with orderBy first, fallback to without orderBy if it fails
         FirebaseUtil.getProducts().orderBy("productId")
                 .get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                        if (task.isSuccessful()) {
-                            int i = 0;
+                        if (task.isSuccessful() && task.getResult() != null) {
                             List<ProductModel> products = new ArrayList<>();
                             List<String> docIds = new ArrayList<>();
                             for (QueryDocumentSnapshot document : task.getResult()) {
-                                products.add(document.toObject(ProductModel.class));
-                                docIds.add(document.getId());
-                                i++;
+                                try {
+                                    ProductModel product = document.toObject(ProductModel.class);
+                                    if (product != null && product.getProductId() > 0) {
+                                        products.add(product);
+                                        docIds.add(document.getId());
+                                    }
+                                } catch (Exception e) {
+                                    Log.e("ModifyProductActivity", "Error parsing product document", e);
+                                }
                             }
-                            myCallback.onCallback(products, docIds);
+                            // Sort by productId manually if needed
+                            if (products.size() > 0) {
+                                // Sort products by productId
+                                for (int i = 0; i < products.size() - 1; i++) {
+                                    for (int j = i + 1; j < products.size(); j++) {
+                                        if (products.get(i).getProductId() > products.get(j).getProductId()) {
+                                            ProductModel temp = products.get(i);
+                                            products.set(i, products.get(j));
+                                            products.set(j, temp);
+                                            String tempDocId = docIds.get(i);
+                                            docIds.set(i, docIds.get(j));
+                                            docIds.set(j, tempDocId);
+                                        }
+                                    }
+                                }
+                                myCallback.onCallback(products, docIds);
+                            } else {
+                                Log.w("ModifyProductActivity", "No products found to display");
+                                Toast.makeText(context, "No products found", Toast.LENGTH_SHORT).show();
+                            }
+                        } else {
+                            // If orderBy fails (e.g., missing index), try without orderBy
+                            Log.w("ModifyProductActivity", "orderBy query failed, trying without orderBy", task.getException());
+                            loadProductsWithoutOrderBy(myCallback);
                         }
                     }
                 });
@@ -178,19 +207,49 @@ public class ModifyProductActivity extends AppCompatActivity {
                     }
                 });
         categories = new String[size[0]];
+    }
 
-        FirebaseUtil.getCategories().orderBy("name")
+    private void loadProductsWithoutOrderBy(MyCallback myCallback) {
+        FirebaseUtil.getProducts()
                 .get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                        if (task.isSuccessful()) {
-                            int i = 0;
+                        if (task.isSuccessful() && task.getResult() != null) {
+                            List<ProductModel> products = new ArrayList<>();
+                            List<String> docIds = new ArrayList<>();
                             for (QueryDocumentSnapshot document : task.getResult()) {
-                                categories[i] = ((String) document.getData().get("name"));
-                                Log.i("Category", categories[i]);
-                                i++;
+                                try {
+                                    ProductModel product = document.toObject(ProductModel.class);
+                                    if (product != null && product.getProductId() > 0) {
+                                        products.add(product);
+                                        docIds.add(document.getId());
+                                    }
+                                } catch (Exception e) {
+                                    Log.e("ModifyProductActivity", "Error parsing product document", e);
+                                }
                             }
-                            myCallback.onCallback(categories);
+                            // Sort products by productId manually
+                            if (products.size() > 0) {
+                                for (int i = 0; i < products.size() - 1; i++) {
+                                    for (int j = i + 1; j < products.size(); j++) {
+                                        if (products.get(i).getProductId() > products.get(j).getProductId()) {
+                                            ProductModel temp = products.get(i);
+                                            products.set(i, products.get(j));
+                                            products.set(j, temp);
+                                            String tempDocId = docIds.get(i);
+                                            docIds.set(i, docIds.get(j));
+                                            docIds.set(j, tempDocId);
+                                        }
+                                    }
+                                }
+                                myCallback.onCallback(products, docIds);
+                            } else {
+                                Log.w("ModifyProductActivity", "No products found to display");
+                                Toast.makeText(context, "No products found", Toast.LENGTH_SHORT).show();
+                            }
+                        } else {
+                            Log.e("ModifyProductActivity", "Error loading products without orderBy", task.getException());
+                            Toast.makeText(context, "Error loading products", Toast.LENGTH_SHORT).show();
                         }
                     }
                 });

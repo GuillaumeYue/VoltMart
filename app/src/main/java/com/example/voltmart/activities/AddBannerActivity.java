@@ -31,8 +31,12 @@ import com.google.android.gms.tasks.Task;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.SetOptions;
 import com.squareup.picasso.Callback;
 import com.squareup.picasso.Picasso;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import cn.pedant.SweetAlert.SweetAlertDialog;
 
@@ -46,7 +50,7 @@ public class AddBannerActivity extends AppCompatActivity {
     AutoCompleteTextView statusDropDown;
     ArrayAdapter<String> arrayAdapter;
     String status, bannerImage;
-    int bannerId;
+    int bannerId = 1; // Initialize with default value
     Context context = this;
     boolean imageUploaded = false;
 
@@ -69,12 +73,33 @@ public class AddBannerActivity extends AppCompatActivity {
         backBtn = findViewById(R.id.backBtn);
         removeImageBtn = findViewById(R.id.removeImageBtn);
 
+        // Set initial bannerId value immediately
+        idEditText.setText(bannerId + "");
+
         FirebaseUtil.getDetails().get()
                 .addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                        if (task.isSuccessful()) {
-                            bannerId = Integer.parseInt(task.getResult().get("lastBannerId").toString()) + 1;
+                        if (task.isSuccessful() && task.getResult() != null) {
+                            DocumentSnapshot document = task.getResult();
+                            Object lastBannerIdObj = document.get("lastBannerId");
+                            if (lastBannerIdObj != null) {
+                                try {
+                                    bannerId = Integer.parseInt(lastBannerIdObj.toString()) + 1;
+                                    idEditText.setText(bannerId + "");
+                                } catch (NumberFormatException e) {
+                                    android.util.Log.e("AddBannerActivity", "Error parsing lastBannerId", e);
+                                    bannerId = 1; // Default to 1 if parsing fails
+                                    idEditText.setText(bannerId + "");
+                                }
+                            } else {
+                                // If lastBannerId doesn't exist, start from 1
+                                bannerId = 1;
+                                idEditText.setText(bannerId + "");
+                            }
+                        } else {
+                            // If document doesn't exist or task failed, start from 1
+                            bannerId = 1;
                             idEditText.setText(bannerId + "");
                         }
                     }
@@ -118,6 +143,18 @@ public class AddBannerActivity extends AppCompatActivity {
     private void addToFirebase() {
         if (!validate())
             return;
+        
+        // Get bannerId from idEditText if available, otherwise use the initialized value
+        String idStr = idEditText.getText().toString().trim();
+        if (!idStr.isEmpty()) {
+            try {
+                bannerId = Integer.parseInt(idStr);
+            } catch (NumberFormatException e) {
+                android.util.Log.e("AddBannerActivity", "Error parsing bannerId from EditText", e);
+                // Keep the existing bannerId value
+            }
+        }
+        
         String bannerDesc = descEditText.getText().toString();
 
         BannerModel banner = new BannerModel(bannerId, bannerImage, bannerDesc, status);
@@ -126,12 +163,20 @@ public class AddBannerActivity extends AppCompatActivity {
                 .addOnSuccessListener(new OnSuccessListener<DocumentReference>() {
                     @Override
                     public void onSuccess(DocumentReference documentReference) {
-                        FirebaseUtil.getDetails().update("lastBannerId", bannerId)
+                        // Use set with merge to create document if it doesn't exist
+                        Map<String, Object> detailsMap = new HashMap<>();
+                        detailsMap.put("lastBannerId", bannerId);
+                        FirebaseUtil.getDetails().set(detailsMap, SetOptions.merge())
                                 .addOnCompleteListener(new OnCompleteListener<Void>() {
                                     @Override
                                     public void onComplete(@NonNull Task<Void> task) {
                                         if (task.isSuccessful()) {
                                             Toast.makeText(AddBannerActivity.this, "Banner has been added successfully!", Toast.LENGTH_SHORT).show();
+                                            finish();
+                                        } else {
+                                            // Even if updating details fails, banner was added successfully
+                                            Toast.makeText(AddBannerActivity.this, "Banner has been added successfully!", Toast.LENGTH_SHORT).show();
+                                            android.util.Log.e("AddBannerActivity", "Failed to update lastBannerId", task.getException());
                                             finish();
                                         }
                                     }
@@ -168,8 +213,8 @@ public class AddBannerActivity extends AppCompatActivity {
             idEditText.setError("Id is required");
             isValid = false;
         }
-        if (status.trim().length() == 0) {
-            statusDropDown.setError("Category is required");
+        if (status == null || status.trim().length() == 0) {
+            statusDropDown.setError("Status is required");
             isValid = false;
         }
         if (descEditText.getText().toString().trim().length() == 0) {
@@ -227,6 +272,9 @@ public class AddBannerActivity extends AppCompatActivity {
 
     public void onBackPressed() {
         super.onBackPressed();
-        FirebaseUtil.getBannerImageReference(bannerId + "").delete();
+        // Only delete image if one was uploaded
+        if (imageUploaded && bannerId > 0) {
+            FirebaseUtil.getBannerImageReference(bannerId + "").delete();
+        }
     }
 }

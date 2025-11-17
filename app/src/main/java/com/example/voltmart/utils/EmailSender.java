@@ -26,7 +26,7 @@ public class EmailSender {
     public EmailSender(String subject, String messageBody, String email) {
         this.subject = subject;
         this.messageBody = messageBody;
-        this.recipientEmail = recipientEmail;
+        this.recipientEmail = email; // Fixed: was using recipientEmail (null) instead of email parameter
     }
     public void sendEmail() {
         new Thread(new Runnable() {
@@ -49,7 +49,13 @@ public class EmailSender {
                         });
 
                 try {
-                    Log.i("Email", recipientEmail);
+                    // Only log if recipientEmail is not null to prevent crash
+                    if (recipientEmail != null) {
+                        Log.i("Email", "Sending email to: " + recipientEmail);
+                    } else {
+                        Log.e("Email", "Recipient email is null, cannot send email");
+                        return;
+                    }
                     MimeMessage message = new MimeMessage(session);
                     message.setFrom(new InternetAddress(emailUsername));
                     message.addRecipient(Message.RecipientType.TO, new InternetAddress(recipientEmail));

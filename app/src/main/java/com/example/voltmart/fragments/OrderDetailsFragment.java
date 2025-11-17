@@ -84,7 +84,25 @@ public class OrderDetailsFragment extends Fragment {
             activity.onBackPressed();
         });
 
-        int oid = getArguments().getInt("orderId");
+        // Get orderId, productId, and documentId from arguments with null safety
+        Bundle args = getArguments();
+        if (args == null) {
+            android.util.Log.e("OrderDetailsFragment", "Arguments are null, cannot load order details");
+            Toast.makeText(activity, "Error: Order information not available", Toast.LENGTH_SHORT).show();
+            activity.onBackPressed();
+            return view;
+        }
+        
+        int oid = args.getInt("orderId", -1);
+        int productId = args.getInt("productId", -1);
+        String documentId = args.getString("documentId");
+        
+        if (oid == -1) {
+            android.util.Log.e("OrderDetailsFragment", "OrderId not found in arguments");
+            Toast.makeText(activity, "Error: Order ID not found", Toast.LENGTH_SHORT).show();
+            activity.onBackPressed();
+            return view;
+        }
 
         dialog = new SweetAlertDialog(activity, SweetAlertDialog.PROGRESS_TYPE);
         dialog.getProgressHelper().setBarColor(Color.parseColor("#A5DC86"));
@@ -93,7 +111,8 @@ public class OrderDetailsFragment extends Fragment {
 
         dialog.show();
 
-        initProduct(oid, new FirestoreCallback() {
+        // Use documentId if available (most reliable), otherwise use orderId + productId
+        initProduct(oid, productId, documentId, new FirestoreCallback() {
             @Override
             public void onCallback(OrderItemModel orderItem) {
                 Picasso.get().load(orderItem.getImage()).into(productImageView);
@@ -194,20 +213,101 @@ public class OrderDetailsFragment extends Fragment {
                 });
     }
 
-    private void initProduct(int orderId, FirestoreCallback callback) {
-        FirebaseUtil.getOrderItems().whereEqualTo("orderId", orderId)
-                .get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-                    @Override
-                    public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                        if (task.isSuccessful()) {
-                            for (QueryDocumentSnapshot document : task.getResult()) {
+    private void initProduct(int orderId, int productId, String documentId, FirestoreCallback callback) {
+        // If documentId is available, use it directly (most reliable)
+        if (documentId != null && !documentId.isEmpty()) {
+            FirebaseUtil.getOrderItems().document(documentId)
+                    .get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+                        @Override
+                        public void onComplete(@NonNull Task<DocumentSnapshot> task) {
+                            if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
+                                DocumentSnapshot document = task.getResult();
                                 orderItem = document.toObject(OrderItemModel.class);
-
-                                callback.onCallback(orderItem);
+                                if (orderItem != null) {
+                                    callback.onCallback(orderItem);
+                                } else {
+                                    android.util.Log.e("OrderDetailsFragment", "Failed to parse order item from document");
+                                    dialog.dismiss();
+                                    Toast.makeText(getActivity(), "Error loading order details", Toast.LENGTH_SHORT).show();
+                                }
+                            } else {
+                                android.util.Log.e("OrderDetailsFragment", "Document not found: " + documentId);
+                                dialog.dismiss();
+                                Toast.makeText(getActivity(), "Order not found", Toast.LENGTH_SHORT).show();
                             }
                         }
-                    }
-                });
+                    });
+        } else if (productId > 0) {
+            // Fallback: query by orderId AND productId to get the specific item
+            FirebaseUtil.getOrderItems()
+                    .whereEqualTo("orderId", orderId)
+                    .whereEqualTo("productId", productId)
+                    .get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                        @Override
+                        public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                            if (task.isSuccessful() && task.getResult() != null) {
+                                QuerySnapshot result = task.getResult();
+                                if (!result.isEmpty()) {
+                                    // Get the first (and should be only) matching document
+                                    for (QueryDocumentSnapshot document : result) {
+                                        orderItem = document.toObject(OrderItemModel.class);
+                                        if (orderItem != null) {
+                                            callback.onCallback(orderItem);
+                                        } else {
+                                            android.util.Log.e("OrderDetailsFragment", "Failed to parse order item");
+                                            dialog.dismiss();
+                                            Toast.makeText(getActivity(), "Error loading order details", Toast.LENGTH_SHORT).show();
+                                        }
+                                        break; // Only process the first document
+                                    }
+                                } else {
+                                    android.util.Log.e("OrderDetailsFragment", "No order found with orderId=" + orderId + ", productId=" + productId);
+                                    dialog.dismiss();
+                                    Toast.makeText(getActivity(), "Order not found", Toast.LENGTH_SHORT).show();
+                                }
+                            } else {
+                                android.util.Log.e("OrderDetailsFragment", "Error querying order", task.getException());
+                                dialog.dismiss();
+                                Toast.makeText(getActivity(), "Error loading order", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    });
+        } else {
+            // Last resort: query by orderId only (may return multiple items, use the first one)
+            android.util.Log.w("OrderDetailsFragment", "No documentId or productId provided, using orderId only");
+            FirebaseUtil.getOrderItems().whereEqualTo("orderId", orderId)
+                    .limit(1) // Limit to 1 result to avoid ambiguity
+                    .get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                        @Override
+                        public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                            if (task.isSuccessful() && task.getResult() != null) {
+                                QuerySnapshot result = task.getResult();
+                                if (!result.isEmpty()) {
+                                    // Get the first document
+                                    for (QueryDocumentSnapshot document : result) {
+                                        orderItem = document.toObject(OrderItemModel.class);
+                                        if (orderItem != null) {
+                                            callback.onCallback(orderItem);
+                                        } else {
+                                            android.util.Log.e("OrderDetailsFragment", "Failed to parse order item");
+                                            dialog.dismiss();
+                                            Toast.makeText(getActivity(), "Error loading order details", Toast.LENGTH_SHORT).show();
+                                        }
+                                        break; // Only process the first document
+                                    }
+                                } else {
+                                    android.util.Log.e("OrderDetailsFragment", "No order found with orderId=" + orderId);
+                                    dialog.dismiss();
+                                    Toast.makeText(getActivity(), "Order not found", Toast.LENGTH_SHORT).show();
+                                }
+                            } else {
+                                android.util.Log.e("OrderDetailsFragment", "Error querying order", task.getException());
+                                dialog.dismiss();
+                                Toast.makeText(getActivity(), "Error loading order", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    });
+        }
     }
 
     public interface FirestoreCallback {

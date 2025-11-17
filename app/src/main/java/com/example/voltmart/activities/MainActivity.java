@@ -120,17 +120,29 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onSearchStateChanged(boolean enabled) {
                     super.onSearchStateChanged(enabled);
+                    Log.d("MainActivity", "Search state changed: enabled=" + enabled);
                 }
 
                 @Override
                 public void onSearchConfirmed(CharSequence text) {
-                    if (!searchFragment.isAdded())
-                        getSupportFragmentManager().beginTransaction().replace(R.id.main_frame_layout, searchFragment, "search").addToBackStack(null).commit();
+                    Log.d("MainActivity", "Search confirmed: " + text);
+                    // Only navigate to search fragment if not already there
+                    Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.main_frame_layout);
+                    if (currentFragment == null || !(currentFragment instanceof SearchFragment)) {
+                        // Create a new SearchFragment instance for each search
+                        SearchFragment newSearchFragment = new SearchFragment();
+                        getSupportFragmentManager().beginTransaction()
+                                .replace(R.id.main_frame_layout, newSearchFragment, "search")
+                                .addToBackStack(null)
+                                .commit();
+                    }
                     super.onSearchConfirmed(text);
                 }
 
                 @Override
                 public void onButtonClicked(int buttonCode) {
+                    Log.d("MainActivity", "Button clicked: buttonCode=" + buttonCode);
+                    // Let SearchFragment handle the close button
                     super.onButtonClicked(buttonCode);
                 }
             });

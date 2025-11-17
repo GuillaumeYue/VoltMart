@@ -52,6 +52,7 @@ public class CheckoutActivity extends AppCompatActivity {
 
     int subTotal, count=0;
     volatile boolean adequateStock = true, done = false;
+    volatile boolean successDialogShown = false; // Guard to prevent showing dialog multiple times
 
     EditText nameEditText, emailEditText, phoneEditText, addressEditText, commentEditText;
     String name, email, phone, address, comment;
@@ -184,12 +185,19 @@ public class CheckoutActivity extends AppCompatActivity {
         Log.i("check 3",productDocId[0].size()+"");
 
         // Delete cart items with proper error handling
+        // Wait for all deletions to complete before showing success dialog
         int[] deletedCount = new int[1];
         int totalCartItems = cartDocument[0].size();
 
         if (totalCartItems == 0) {
             Log.w("CheckoutActivity", "No cart items to delete");
+            // No items to delete, proceed directly to success
+            if (!successDialogShown) {
+                successDialogShown = true;
+                showSuccessDialog();
+            }
         } else {
+            // Delete all cart items and wait for completion
             for (String docId : cartDocument[0]){
                 FirebaseUtil.getCartItems().document(docId)
                         .delete().addOnCompleteListener(new OnCompleteListener<Void>() {
@@ -200,44 +208,20 @@ public class CheckoutActivity extends AppCompatActivity {
                                     Log.i("CheckoutActivity", "Cart item deleted: " + docId + " (" + deletedCount[0] + "/" + totalCartItems + ")");
                                 } else {
                                     Log.e("CheckoutActivity", "Failed to delete cart item: " + docId, task.getException());
+                                    // Still count as processed even if deletion failed
+                                    deletedCount[0]++;
+                                }
+                                
+                                // Check if all deletions are complete
+                                if (deletedCount[0] >= totalCartItems && !successDialogShown) {
+                                    Log.i("CheckoutActivity", "All cart items deletion completed (" + deletedCount[0] + "/" + totalCartItems + ")");
+                                    successDialogShown = true; // Set flag before showing dialog
+                                    showSuccessDialog();
                                 }
                             }
                         });
             }
         }
-
-        String subject = "Your Order is successfully placed with VoltMart!";
-        String messageBody = "Dear " + name + ",\n\n" +
-                "Thank you for placing your order with VoltMart. We are excited to inform you that your order has been successfully placed.\n\n" +
-                "Order Details:\n" +
-                "-----------------------------------------------------------------------------------\n" +
-                String.format("%-50s %-10s %-10s\n", "Product Name", "Quantity", "Price") +
-                "-----------------------------------------------------------------------------------\n";
-        for (int i = 0; i < productName[0].size(); i++) {
-            messageBody += String.format("%-50s %-10s $%-10d\n", productName[0].get(i), productQuantity[0].get(i), productPrice[0].get(i));
-        }
-        messageBody += "-----------------------------------------------------------------------------\n" +
-                String.format("%-73s $%-10d\n", "Total:", subTotal) +
-                "-----------------------------------------------------------------------------\n\n" +
-                "Thank you for choosing our service. If you have any questions or concerns, feel free to contact our customer support.\n\n" +
-                "Best Regards,\n" +
-                "VoltMart Team";
-        EmailSender emailSender = new EmailSender(subject, messageBody, email);
-        Log.i("startEmail", email);
-        emailSender.sendEmail();
-
-        new SweetAlertDialog(CheckoutActivity.this, SweetAlertDialog.SUCCESS_TYPE)
-                .setTitleText("Order placed Successfully!")
-                .setContentText("You will shortly receive an email confirming the order details.")
-                .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
-                    @Override
-                    public void onClick(SweetAlertDialog sweetAlertDialog) {
-                        Intent intent = new Intent(CheckoutActivity.this, MainActivity.class);
-                        intent.putExtra("orderPlaced", true);
-                        startActivity(intent);
-                        finish();
-                    }
-                }).show();
     }
 
     private void processOrder(FirestoreCallback callback) {
@@ -411,6 +395,44 @@ public class CheckoutActivity extends AppCompatActivity {
             isValid = false;
         }
         return isValid;
+    }
+
+    /**
+     * Shows the success dialog after all cart items are deleted
+     */
+    private void showSuccessDialog() {
+        String subject = "Your Order is successfully placed with VoltMart!";
+        String messageBody = "Dear " + name + ",\n\n" +
+                "Thank you for placing your order with VoltMart. We are excited to inform you that your order has been successfully placed.\n\n" +
+                "Order Details:\n" +
+                "-----------------------------------------------------------------------------------\n" +
+                String.format("%-50s %-10s %-10s\n", "Product Name", "Quantity", "Price") +
+                "-----------------------------------------------------------------------------------\n";
+        for (int i = 0; i < productName[0].size(); i++) {
+            messageBody += String.format("%-50s %-10s $%-10d\n", productName[0].get(i), productQuantity[0].get(i), productPrice[0].get(i));
+        }
+        messageBody += "-----------------------------------------------------------------------------\n" +
+                String.format("%-73s $%-10d\n", "Total:", subTotal) +
+                "-----------------------------------------------------------------------------\n\n" +
+                "Thank you for choosing our service. If you have any questions or concerns, feel free to contact our customer support.\n\n" +
+                "Best Regards,\n" +
+                "VoltMart Team";
+        EmailSender emailSender = new EmailSender(subject, messageBody, email);
+        Log.i("startEmail", email);
+        emailSender.sendEmail();
+
+        new SweetAlertDialog(CheckoutActivity.this, SweetAlertDialog.SUCCESS_TYPE)
+                .setTitleText("Order placed Successfully!")
+                .setContentText("You will shortly receive an email confirming the order details.")
+                .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
+                    @Override
+                    public void onClick(SweetAlertDialog sweetAlertDialog) {
+                        Intent intent = new Intent(CheckoutActivity.this, MainActivity.class);
+                        intent.putExtra("orderPlaced", true);
+                        startActivity(intent);
+                        finish();
+                    }
+                }).show();
     }
 
     @Override

@@ -154,8 +154,13 @@ public class CartFragment extends Fragment implements CartAdapter.CartAdapterLis
         if (getActivity() != null) {
             LocalBroadcastManager.getInstance(getActivity()).registerReceiver(mMessageReceiver, new IntentFilter("price"));
         }
+        // Restart adapter listening when fragment resumes
+        // This is important when returning from checkout after items are deleted
         if (cartAdapter != null) {
             cartAdapter.startListening();
+        } else {
+            // If adapter is null (e.g., after checkout), recreate it
+            getCartProducts();
         }
     }
 
