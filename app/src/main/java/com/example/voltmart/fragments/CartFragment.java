@@ -35,7 +35,7 @@ import com.facebook.shimmer.ShimmerFrameLayout;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.firebase.firestore.Query;
 
-public class CartFragment extends Fragment {
+public class CartFragment extends Fragment implements CartAdapter.CartAdapterListener {
     TextView cartPriceTextView;
     RecyclerView cartRecyclerView;
     Button continueBtn;
@@ -108,6 +108,7 @@ public class CartFragment extends Fragment {
 
         emptyCartImageView.setVisibility(View.INVISIBLE);
         cartAdapter = new CartAdapter(options, getActivity());
+        cartAdapter.setCartAdapterListener(this);
         LinearLayoutManager manager = new LinearLayoutManager(getActivity());
         cartRecyclerView.setLayoutManager(manager);
         cartRecyclerView.setAdapter(cartAdapter);
@@ -115,9 +116,62 @@ public class CartFragment extends Fragment {
     }
 
     @Override
+    public void onCartEmpty() {
+        if (shimmerFrameLayout != null) {
+            shimmerFrameLayout.stopShimmer();
+            shimmerFrameLayout.setVisibility(View.GONE);
+        }
+        if (mainLinearLayout != null) {
+            mainLinearLayout.setVisibility(View.VISIBLE);
+        }
+        if (emptyCartImageView != null) {
+            emptyCartImageView.setVisibility(View.VISIBLE);
+        }
+    }
+
+    @Override
+    public void onCartHasItems() {
+        if (emptyCartImageView != null) {
+            emptyCartImageView.setVisibility(View.INVISIBLE);
+        }
+    }
+
+    @Override
+    public void onItemsLoaded() {
+        // Stop shimmer and show main layout when items finish loading
+        if (shimmerFrameLayout != null) {
+            shimmerFrameLayout.stopShimmer();
+            shimmerFrameLayout.setVisibility(View.GONE);
+        }
+        if (mainLinearLayout != null) {
+            mainLinearLayout.setVisibility(View.VISIBLE);
+        }
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
-        LocalBroadcastManager.getInstance(getActivity()).registerReceiver(mMessageReceiver, new IntentFilter("price"));
-        cartAdapter.startListening();
+        if (getActivity() != null) {
+            LocalBroadcastManager.getInstance(getActivity()).registerReceiver(mMessageReceiver, new IntentFilter("price"));
+        }
+        // Restart adapter listening when fragment resumes
+        // This is important when returning from checkout after items are deleted
+        if (cartAdapter != null) {
+            cartAdapter.startListening();
+        } else {
+            // If adapter is null (e.g., after checkout), recreate it
+            getCartProducts();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (getActivity() != null) {
+            LocalBroadcastManager.getInstance(getActivity()).unregisterReceiver(mMessageReceiver);
+        }
+        if (cartAdapter != null) {
+            cartAdapter.stopListening();
+        }
     }
 }

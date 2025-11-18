@@ -2,10 +2,12 @@ package com.example.voltmart.adapters;
 
 import android.content.Context;
 import android.graphics.Paint;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -33,19 +35,9 @@ public class ProductAdapter extends FirestoreRecyclerAdapter<ProductModel, Produ
 
     @Override
     protected void onBindViewHolder(@NonNull ProductViewHolder holder, int position, @NonNull ProductModel product) {
-        Picasso.get().load(product.getImage()).into(holder.productImage, new Callback() {
-            @Override
-            public void onSuccess() {
-                if (holder.getBindingAdapterPosition() == 1) {
-                    ShimmerFrameLayout shimmerLayout = activity.findViewById(R.id.shimmerLayout);
-                    shimmerLayout.setVisibility(View.GONE);
-                    activity.findViewById(R.id.mainLinearLayout).setVisibility(View.VISIBLE);
-                }
-            }
-            @Override
-            public void onError(Exception e) {
-            }
-        });
+        Log.d("ProductAdapter", "onBindViewHolder: " + position + " - " + product.getName());
+
+        Picasso.get().load(product.getImage()).into(holder.productImage);
         holder.productLabel.setText(product.getName());
         holder.productPrice.setText("$ "+ product.getPrice());
         holder.originalPrice.setText("$ " + product.getOriginalPrice());
@@ -54,21 +46,16 @@ public class ProductAdapter extends FirestoreRecyclerAdapter<ProductModel, Produ
         holder.discountPercentage.setText(discountPerc + "% OFF");
 
         holder.itemView.setOnClickListener(v -> {
-//            ProductFragment productFragment = new ProductFragment();
-//            getIntent().putExtra("productObj", product);
-//            Bundle bundle = new Bundle();
-//            bundle.putParcelable("carInfo", product);  // Key, value
             Fragment fragment = ProductFragment.newInstance(product);
-            activity.getSupportFragmentManager().beginTransaction().replace(R.id.main_frame_layout, fragment).addToBackStack(null).commit();
-//            Intent intent = new Intent(context, ProductDetailActivity.class);
-////            intent.putExtra("name", product.getName());
-////            intent.putExtra("image", product.getImage());
-////            intent.putExtra("id", product.getId());
-////            intent.putExtra("price", product.getPrice());
-//            intent.putExtra("productObj", product);
-//            context.startActivity(intent);
+            activity.getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.main_frame_layout, fragment)
+                    .addToBackStack(null)
+                    .commit();
         });
     }
+
+
 
     @NonNull
     @Override

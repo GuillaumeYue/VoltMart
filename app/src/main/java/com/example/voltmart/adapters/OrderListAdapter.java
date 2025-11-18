@@ -40,13 +40,31 @@ public class OrderListAdapter extends FirestoreRecyclerAdapter<OrderItemModel, O
         holder.orderDate.setText(time);
         Picasso.get().load(model.getImage()).into(holder.productImage);
 
-        Bundle bundle = new Bundle();
-        bundle.putInt("orderId", model.getOrderId());
-        OrderDetailsFragment fragment = new OrderDetailsFragment();
-        fragment.setArguments(bundle);
+        // Create fragment with correct orderId and productId inside click listener to ensure each order shows correct details
         holder.itemView.setOnClickListener(v -> {
-            if (!fragment.isAdded())
-                activity.getSupportFragmentManager().beginTransaction().replace(R.id.main_frame_layout, fragment).addToBackStack(null).commit();
+            if (activity == null) {
+                return;
+            }
+            
+            // Get the document ID for this specific order item
+            String documentId = getSnapshots().getSnapshot(position).getId();
+            
+            // Create a new fragment instance for each click with the correct orderId and documentId
+            Bundle bundle = new Bundle();
+            bundle.putInt("orderId", model.getOrderId());
+            bundle.putInt("productId", model.getProductId());
+            bundle.putString("documentId", documentId); // Pass document ID to uniquely identify this order item
+            OrderDetailsFragment fragment = new OrderDetailsFragment();
+            fragment.setArguments(bundle);
+            
+            // Only navigate if fragment is not already added
+            if (!fragment.isAdded()) {
+                activity.getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.main_frame_layout, fragment)
+                        .addToBackStack(null)
+                        .commit();
+            }
         });
     }
 

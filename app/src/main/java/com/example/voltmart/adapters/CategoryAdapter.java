@@ -9,15 +9,12 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.fragment.app.FragmentTransaction;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.voltmart.R;
-import com.example.voltmart.fragments.CategoryFragment;
 import com.example.voltmart.model.CategoryModel;
 import com.firebase.ui.firestore.FirestoreRecyclerAdapter;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
-import com.squareup.picasso.Picasso;
 
 public class CategoryAdapter extends FirestoreRecyclerAdapter<CategoryModel, CategoryAdapter.CategoryViewHolder> {
 
@@ -29,21 +26,7 @@ public class CategoryAdapter extends FirestoreRecyclerAdapter<CategoryModel, Cat
     }
     @Override
     protected void onBindViewHolder(@NonNull CategoryViewHolder categoryViewHolder, int i, @NonNull CategoryModel categoryModel) {
-        categoryViewHolder.categoryLabel.setText(categoryModel.getName());
-        Picasso.get().load(categoryModel.getIcon()).into(categoryViewHolder.categoryImage);
-        
-        categoryViewHolder.itemView.setOnClickListener(v -> {
-            AppCompatActivity activity = (AppCompatActivity) context;
-            CategoryFragment categoryFragment = new CategoryFragment();
-            android.os.Bundle bundle = new android.os.Bundle();
-            bundle.putString("categoryName", categoryModel.getName());
-            categoryFragment.setArguments(bundle);
-            
-            FragmentTransaction transaction = activity.getSupportFragmentManager().beginTransaction();
-            transaction.replace(R.id.main_frame_layout, categoryFragment);
-            transaction.addToBackStack(null);
-            transaction.commit();
-        });
+
     }
 
     @NonNull

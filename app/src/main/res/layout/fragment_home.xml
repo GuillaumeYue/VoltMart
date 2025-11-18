@@ -69,7 +69,10 @@
                     android:id="@+id/categoryRecyclerView"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@color/white"/>
+                    android:minHeight="140dp"
+                    android:background="@color/white"
+                    android:padding="8dp"
+                    android:clipToPadding="false"/>
 
             </androidx.cardview.widget.CardView>
 

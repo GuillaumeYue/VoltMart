@@ -74,12 +74,32 @@ public class AdminActivity extends AppCompatActivity {
                 .addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                        if (task.isSuccessful()){
-                            countOrders.setText(task.getResult().get("countOfOrderedItems").toString());
-                            priceOrders.setText(task.getResult().get("priceOfOrders").toString());
+                        if (!task.isSuccessful()) {
+                            // 读取失败，给默认值，避免崩溃
+                            countOrders.setText("0");
+                            priceOrders.setText("0");
+                            return;
                         }
+
+                        DocumentSnapshot snapshot = task.getResult();
+                        if (snapshot == null || !snapshot.exists()) {
+                            // 文档不存在，给默认值
+                            countOrders.setText("0");
+                            priceOrders.setText("0");
+                            return;
+                        }
+
+                        Object countObj = snapshot.get("countOfOrderedItems");
+                        Object priceObj = snapshot.get("priceOfOrders");
+
+                        // 防止空指针，如果是 null，就显示 0
+                        String countText = (countObj == null) ? "0" : countObj.toString();
+                        String priceText = (priceObj == null) ? "0" : priceObj.toString();
+
+                        countOrders.setText(countText);
+                        priceOrders.setText(priceText);
                     }
                 });
-
     }
+
 }
