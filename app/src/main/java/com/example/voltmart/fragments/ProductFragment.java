@@ -165,8 +165,8 @@ public class ProductFragment extends Fragment {
         Picasso.get().load(currentProduct.getImage()).into(productImage);
         productName.setText(currentProduct.getName());
         int discountPerc = (currentProduct.getDiscount() * 100) / currentProduct.getOriginalPrice();
-        productPrice.setText("₹ " + currentProduct.getPrice());
-        originalPrice.setText("₹ " + currentProduct.getOriginalPrice());
+        productPrice.setText("$ " + currentProduct.getPrice());
+        originalPrice.setText("$ " + currentProduct.getOriginalPrice());
         originalPrice.setPaintFlags(originalPrice.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
         discountPercentage.setText(discountPerc + "% OFF");
 

@@ -169,6 +169,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void addOrRemoveBadge() {
+        // Check if user is authenticated before accessing cart items
+        if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() == null) {
+            // User not logged in, hide badge
+            BadgeDrawable badge = bottomNavigationView.getOrCreateBadge(R.id.cart);
+            badge.setVisible(false);
+            badge.clearNumber();
+            return;
+        }
+        
         FirebaseUtil.getCartItems().get()
                 .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                     @Override

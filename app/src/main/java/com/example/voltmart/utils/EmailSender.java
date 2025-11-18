@@ -26,7 +26,7 @@ public class EmailSender {
     public EmailSender(String subject, String messageBody, String email) {
         this.subject = subject;
         this.messageBody = messageBody;
-        this.recipientEmail = recipientEmail;
+        this.recipientEmail = email;
     }
     public void sendEmail() {
         new Thread(new Runnable() {
@@ -49,16 +49,22 @@ public class EmailSender {
                         });
 
                 try {
-                    Log.i("Email", recipientEmail);
-                    MimeMessage message = new MimeMessage(session);
-                    message.setFrom(new InternetAddress(emailUsername));
-                    message.addRecipient(Message.RecipientType.TO, new InternetAddress(recipientEmail));
-                    message.setSubject(subject);
-                    message.setText(messageBody);
+                    if (recipientEmail != null && !recipientEmail.isEmpty()) {
+                        Log.i("Email", "Sending email to: " + recipientEmail);
+                        MimeMessage message = new MimeMessage(session);
+                        message.setFrom(new InternetAddress(emailUsername));
+                        message.addRecipient(Message.RecipientType.TO, new InternetAddress(recipientEmail));
+                        message.setSubject(subject);
+                        message.setText(messageBody);
 
-                    Transport.send(message);
+                        Transport.send(message);
+                        Log.i("Email", "Email sent successfully");
+                    } else {
+                        Log.w("Email", "Recipient email is null or empty, skipping email send");
+                    }
                 }
                 catch (MessagingException e) {
+                    Log.e("Email", "Failed to send email: " + e.getMessage());
                     e.printStackTrace();
                 }
                 Looper.loop();

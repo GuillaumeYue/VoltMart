@@ -42,7 +42,12 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
 
     @Override
     protected void onBindViewHolder(@NonNull CartViewHolder holder, int position, @NonNull CartItemModel model) {
-        activity.findViewById(R.id.emptyCartImageView).setVisibility(View.INVISIBLE);
+        if (activity != null) {
+            View emptyCartImageView = activity.findViewById(R.id.emptyCartImageView);
+            if (emptyCartImageView != null) {
+                emptyCartImageView.setVisibility(View.INVISIBLE);
+            }
+        }
         if (position == 0 && !gotSum) {
             calculateTotalPrice();
         }
@@ -56,11 +61,16 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
         Picasso.get().load(model.getImage()).into(holder.productCartImage, new Callback() {
             @Override
             public void onSuccess() {
-                if (holder.getBindingAdapterPosition() == getSnapshots().size()-1) {
+                if (holder.getBindingAdapterPosition() == getSnapshots().size()-1 && activity != null) {
                     ShimmerFrameLayout shimmerLayout = activity.findViewById(R.id.shimmerLayout);
-                    shimmerLayout.stopShimmer();
-                    shimmerLayout.setVisibility(View.GONE);
-                    activity.findViewById(R.id.mainLinearLayout).setVisibility(View.VISIBLE);
+                    if (shimmerLayout != null) {
+                        shimmerLayout.stopShimmer();
+                        shimmerLayout.setVisibility(View.GONE);
+                    }
+                    View mainLinearLayout = activity.findViewById(R.id.mainLinearLayout);
+                    if (mainLinearLayout != null) {
+                        mainLinearLayout.setVisibility(View.VISIBLE);
+                    }
                 }
             }
             @Override
@@ -158,19 +168,42 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
     @Override
     public void onDataChanged() {
         super.onDataChanged();
-        if (getItemCount() == 0){
-//            Toast.makeText(context, "True", Toast.LENGTH_SHORT).show();
-            Activity activity = (Activity) context;
-            ShimmerFrameLayout shimmerLayout = activity.findViewById(R.id.shimmerLayout);
-            shimmerLayout.stopShimmer();
-            shimmerLayout.setVisibility(View.GONE);
-            activity.findViewById(R.id.mainLinearLayout).setVisibility(View.VISIBLE);
-            activity.findViewById(R.id.emptyCartImageView).setVisibility(View.VISIBLE);
+        if (context == null) {
+            return;
         }
-        else {
-//            Toast.makeText(context, "False", Toast.LENGTH_SHORT).show();
+        
+        try {
             Activity activity = (Activity) context;
-            activity.findViewById(R.id.emptyCartImageView).setVisibility(View.INVISIBLE);
+            if (activity == null) {
+                return;
+            }
+            
+            if (getItemCount() == 0){
+                ShimmerFrameLayout shimmerLayout = activity.findViewById(R.id.shimmerLayout);
+                if (shimmerLayout != null) {
+                    shimmerLayout.stopShimmer();
+                    shimmerLayout.setVisibility(View.GONE);
+                }
+                
+                View mainLinearLayout = activity.findViewById(R.id.mainLinearLayout);
+                if (mainLinearLayout != null) {
+                    mainLinearLayout.setVisibility(View.VISIBLE);
+                }
+                
+                View emptyCartImageView = activity.findViewById(R.id.emptyCartImageView);
+                if (emptyCartImageView != null) {
+                    emptyCartImageView.setVisibility(View.VISIBLE);
+                }
+            }
+            else {
+                View emptyCartImageView = activity.findViewById(R.id.emptyCartImageView);
+                if (emptyCartImageView != null) {
+                    emptyCartImageView.setVisibility(View.INVISIBLE);
+                }
+            }
+        } catch (Exception e) {
+            // Silently handle if views are not found
+            e.printStackTrace();
         }
     }
 

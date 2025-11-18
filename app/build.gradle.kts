@@ -15,6 +15,8 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        manifestPlaceholders["MAPS_API_KEY"] = "AIzaSyDEUGiwgdHRRw4-2gmQI3e1DE0MK_KzMwc"
     }
 
     buildTypes {
@@ -92,6 +94,14 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+
+    implementation("com.google.android.gms:play-services-maps:18.1.0")
+    implementation("com.google.android.gms:play-services-location:21.0.1")
+// 如果需要地点搜索
+    implementation("com.google.android.libraries.places:places:3.2.0")
+
+    // Stripe Payment SDK
+    implementation("com.stripe:stripe-android:20.37.0")
 
 }
 

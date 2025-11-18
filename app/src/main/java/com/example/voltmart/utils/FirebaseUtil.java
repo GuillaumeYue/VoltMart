@@ -35,15 +35,28 @@ public class FirebaseUtil {
     }
 
     public static CollectionReference getCartItems(){
-        return FirebaseFirestore.getInstance().collection("cart").document(FirebaseAuth.getInstance().getUid()).collection("items");
+        String uid = FirebaseAuth.getInstance().getUid();
+        if (uid == null) {
+            // Return a dummy collection reference that won't be used if user is not logged in
+            return FirebaseFirestore.getInstance().collection("cart").document("dummy").collection("items");
+        }
+        return FirebaseFirestore.getInstance().collection("cart").document(uid).collection("items");
     }
 
     public static CollectionReference getWishlistItems(){
-        return FirebaseFirestore.getInstance().collection("wishlists").document(FirebaseAuth.getInstance().getUid()).collection("items");
+        String uid = FirebaseAuth.getInstance().getUid();
+        if (uid == null) {
+            return FirebaseFirestore.getInstance().collection("wishlists").document("dummy").collection("items");
+        }
+        return FirebaseFirestore.getInstance().collection("wishlists").document(uid).collection("items");
     }
 
     public static CollectionReference getOrderItems(){
-        return FirebaseFirestore.getInstance().collection("orders").document(FirebaseAuth.getInstance().getUid()).collection("items");
+        String uid = FirebaseAuth.getInstance().getUid();
+        if (uid == null) {
+            return FirebaseFirestore.getInstance().collection("orders").document("dummy").collection("items");
+        }
+        return FirebaseFirestore.getInstance().collection("orders").document(uid).collection("items");
     }
 
     public static CollectionReference getReviews(int pid){
