@@ -5,7 +5,10 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
+import android.text.TextWatcher;
+import android.text.Editable;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
@@ -169,13 +172,40 @@ public class ModifyBannerActivity extends AppCompatActivity {
                 Toast.makeText(context, status, Toast.LENGTH_SHORT).show();
             }
         });
+        
+        // Add text change listener to capture status changes
+        statusDropDown.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (s != null && s.length() > 0) {
+                    status = s.toString();
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
 
         detailsLinearLayout.setVisibility(View.VISIBLE);
         bannerImageView.setVisibility(View.VISIBLE);
         removeImageBtn.setVisibility(View.VISIBLE);
 
         descEditText.setText(currBanner.getDescription());
-        statusDropDown.setText(currBanner.getStatus());
+        // Set the status dropdown text and initialize the status variable
+        String currentStatus = currBanner.getStatus();
+        if (currentStatus != null && !currentStatus.isEmpty()) {
+            statusDropDown.setText(currentStatus, false); // false = don't filter
+            status = currentStatus; // Initialize status variable with current value
+        } else {
+            // Default to "Not Live" if status is null or empty
+            status = "Not Live";
+            statusDropDown.setText(status, false);
+        }
     }
 
     private void updateToFirebase(){
@@ -214,8 +244,18 @@ public class ModifyBannerActivity extends AppCompatActivity {
     void updateDataToFirebase() {
         if (!descEditText.getText().toString().equals(currBanner.getDescription()))
             FirebaseUtil.getBanner().document(docId).update("description", descEditText.getText().toString());
-        if (!statusDropDown.getText().toString().equals(currBanner.getStatus()))
-            FirebaseUtil.getBanner().document(docId).update("status", statusDropDown.getText().toString());
+        
+        // Get the current status from dropdown text, or use the status variable if set
+        String newStatus = statusDropDown.getText().toString().trim();
+        if (newStatus.isEmpty() && status != null) {
+            newStatus = status; // Fallback to status variable if dropdown text is empty
+        }
+        
+        // Only update if status has changed
+        if (!newStatus.isEmpty() && !newStatus.equals(currBanner.getStatus())) {
+            FirebaseUtil.getBanner().document(docId).update("status", newStatus);
+            Log.d("ModifyBanner", "Status updated from '" + currBanner.getStatus() + "' to '" + newStatus + "'");
+        }
     }
 
     private boolean validate() {

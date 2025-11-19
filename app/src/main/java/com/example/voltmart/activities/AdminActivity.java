@@ -17,14 +17,19 @@ import com.example.voltmart.R;
 import com.example.voltmart.utils.FirebaseUtil;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+import android.util.Log;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 
 public class AdminActivity extends AppCompatActivity {
 
     LinearLayout logoutBtn;
     CardView addProductBtn, modifyProductBtn, addCategoryBtn, modifyCategoryBtn, addBannerBtn, modifyBannerBtn;
-    TextView countOrders, priceOrders, usersTextView;
+    CardView ordersCardView, usersCardView;
+    TextView countOrders, usersCount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,10 +45,21 @@ public class AdminActivity extends AppCompatActivity {
         addBannerBtn = findViewById(R.id.addBannerBtn);
         modifyBannerBtn = findViewById(R.id.modifyBannerBtn);
         countOrders = findViewById(R.id.countOrders);
-        priceOrders = findViewById(R.id.priceOrders);
-//        usersTextView = findViewById(R.id.usersTextView);
+        usersCount = findViewById(R.id.usersCount);
+        ordersCardView = findViewById(R.id.ordersCardView);
+        usersCardView = findViewById(R.id.usersCardView);
 
         getDetails();
+        getUserCount();
+        
+        // Set click listeners for the cards
+        ordersCardView.setOnClickListener(v -> {
+            startActivity(new Intent(this, OrdersListActivity.class));
+        });
+        
+        usersCardView.setOnClickListener(v -> {
+            startActivity(new Intent(this, UsersListActivity.class));
+        });
 
         logoutBtn.setOnClickListener(v -> {
             FirebaseAuth.getInstance().signOut();
@@ -77,7 +93,6 @@ public class AdminActivity extends AppCompatActivity {
                         if (!task.isSuccessful()) {
                             // 读取失败，给默认值，避免崩溃
                             countOrders.setText("0");
-                            priceOrders.setText("0");
                             return;
                         }
 
@@ -85,7 +100,6 @@ public class AdminActivity extends AppCompatActivity {
                         if (snapshot == null || !snapshot.exists()) {
                             // 文档不存在，给默认值
                             countOrders.setText("0");
-                            priceOrders.setText("0");
                             return;
                         }
 
@@ -94,11 +108,44 @@ public class AdminActivity extends AppCompatActivity {
 
                         // 防止空指针，如果是 null，就显示 0
                         String countText = (countObj == null) ? "0" : countObj.toString();
-                        String priceText = (priceObj == null) ? "0" : priceObj.toString();
 
                         countOrders.setText(countText);
-                        priceOrders.setText(priceText);
                     }
+                });
+    }
+
+    private void getUserCount() {
+        // First try to count from users collection (if it exists)
+        FirebaseFirestore.getInstance().collection("users")
+                .get()
+                .addOnCompleteListener(usersTask -> {
+                    if (usersTask.isSuccessful() && usersTask.getResult() != null) {
+                        QuerySnapshot usersSnapshot = usersTask.getResult();
+                        int userCount = usersSnapshot.size();
+                        Log.d("AdminActivity", "Found " + userCount + " users in users collection");
+                        if (userCount > 0) {
+                            usersCount.setText(String.valueOf(userCount));
+                            return;
+                        }
+                    }
+                    
+                    // If users collection is empty or doesn't exist, count from orders collection
+                    // Each document in the orders collection represents a user who has placed orders
+                    Log.d("AdminActivity", "Users collection empty or doesn't exist, counting from orders collection");
+                    FirebaseFirestore.getInstance().collection("orders")
+                            .get()
+                            .addOnCompleteListener(ordersTask -> {
+                                if (ordersTask.isSuccessful() && ordersTask.getResult() != null) {
+                                    QuerySnapshot ordersSnapshot = ordersTask.getResult();
+                                    int userCount = ordersSnapshot.size();
+                                    Log.d("AdminActivity", "Found " + userCount + " users from orders collection");
+                                    usersCount.setText(String.valueOf(userCount));
+                                } else {
+                                    Log.e("AdminActivity", "Failed to get user count: " + 
+                                        (ordersTask.getException() != null ? ordersTask.getException().getMessage() : "Unknown error"));
+                                    usersCount.setText("0");
+                                }
+                            });
                 });
     }
 

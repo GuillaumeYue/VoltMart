@@ -87,7 +87,10 @@ public class CheckoutActivity extends AppCompatActivity {
     private FusedLocationProviderClient fusedLocationClient;
     
     // Stripe
-    private static final String STRIPE_PUBLISHABLE_KEY = "pk_test_51SUYMgIjjD15pVReV0PaFvkmwrKx9MNX3pTXrKPcLsy77jxoPV5ctVi11B0iAVqX0vRfGG8uRtVpSg2PdiYjN0Ru003RwUw0vC";
+    // NOTE: Replace with your actual Stripe publishable key from https://dashboard.stripe.com/apikeys
+    // Test key format: pk_test_...
+    // Live key format: pk_live_...
+    private static final String STRIPE_PUBLISHABLE_KEY = "pk_test_51SUYMgIjjD15pVReVOPaFvkmwrKx9MNX3pTXrKPcLsy77jxoPV5ctVi11BOiAVqX0vRfGG8uRtVpSg2PdiYjN0Ru003RwUw0vC";
     private Stripe stripe;
     private String selectedPaymentMethod = "card"; // "card" or "cash"
 
@@ -112,7 +115,12 @@ public class CheckoutActivity extends AppCompatActivity {
         
         // Initialize Stripe PaymentConfiguration BEFORE setContentView
         // This is required because CardInputWidget accesses it during layout inflation
+        if (STRIPE_PUBLISHABLE_KEY == null || STRIPE_PUBLISHABLE_KEY.isEmpty() || !STRIPE_PUBLISHABLE_KEY.startsWith("pk_")) {
+            Log.e("Stripe", "Invalid Stripe publishable key format. Key must start with 'pk_test_' or 'pk_live_'");
+            Toast.makeText(this, "Payment system configuration error", Toast.LENGTH_LONG).show();
+        }
         PaymentConfiguration.init(this, STRIPE_PUBLISHABLE_KEY);
+        Log.d("Stripe", "Stripe PaymentConfiguration initialized with key: " + STRIPE_PUBLISHABLE_KEY.substring(0, Math.min(20, STRIPE_PUBLISHABLE_KEY.length())) + "...");
         
         setContentView(R.layout.activity_checkout);
 
@@ -182,8 +190,8 @@ public class CheckoutActivity extends AppCompatActivity {
             delivery = 0;
             deliveryTextView.setText("$ 0");
         } else {
-            delivery = 50;
-            deliveryTextView.setText("$ 50");
+            delivery = 10;
+            deliveryTextView.setText("$ 10");
         }
         
         // Calculate total: Subtotal + GST + QST + Delivery
@@ -569,8 +577,23 @@ public class CheckoutActivity extends AppCompatActivity {
             public void onError(@NonNull Exception e) {
                 runOnUiThread(() -> {
                     dialog.dismiss();
-                    Log.e("Stripe", "Payment method creation failed: " + e.getMessage());
-                    Toast.makeText(CheckoutActivity.this, "Payment failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    String errorMessage = e.getMessage();
+                    Log.e("Stripe", "Payment method creation failed: " + errorMessage);
+                    
+                    // Provide user-friendly error messages
+                    String userMessage;
+                    if (errorMessage != null && errorMessage.contains("Invalid API Key")) {
+                        userMessage = "Payment configuration error. Please contact support.";
+                        Log.e("Stripe", "Invalid API Key detected. Check STRIPE_PUBLISHABLE_KEY configuration.");
+                    } else if (errorMessage != null && errorMessage.contains("card")) {
+                        userMessage = "Card validation failed. Please check your card details.";
+                    } else if (errorMessage != null) {
+                        userMessage = "Payment failed: " + errorMessage;
+                    } else {
+                        userMessage = "Payment failed. Please try again.";
+                    }
+                    
+                    Toast.makeText(CheckoutActivity.this, userMessage, Toast.LENGTH_LONG).show();
                 });
             }
         });

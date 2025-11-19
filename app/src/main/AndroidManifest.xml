@@ -39,6 +39,12 @@
             android:name=".activities.AdminActivity"
             android:exported="false" />
         <activity
+            android:name=".activities.OrdersListActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activities.UsersListActivity"
+            android:exported="false" />
+        <activity
             android:name=".activities.CheckoutActivity"
             android:exported="false" />
         <activity

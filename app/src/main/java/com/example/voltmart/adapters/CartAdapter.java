@@ -32,13 +32,24 @@ import com.squareup.picasso.Picasso;
 
 public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAdapter.CartViewHolder> {
 
+    public interface CartAdapterListener {
+        void onCartEmpty();
+        void onCartHasItems();
+        void onItemsLoaded();
+    }
+
     private Context context;
     private AppCompatActivity activity;
+    private CartAdapterListener listener;
     //    private ArrayList<ProductModel> products;
     final int[] stock = new int[1];
     int totalPrice = 0;
     boolean gotSum = false;
     int count;
+
+    public void setCartAdapterListener(CartAdapterListener listener) {
+        this.listener = listener;
+    }
 
     @Override
     protected void onBindViewHolder(@NonNull CartViewHolder holder, int position, @NonNull CartItemModel model) {
@@ -61,15 +72,20 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
         Picasso.get().load(model.getImage()).into(holder.productCartImage, new Callback() {
             @Override
             public void onSuccess() {
-                if (holder.getBindingAdapterPosition() == getSnapshots().size()-1 && activity != null) {
-                    ShimmerFrameLayout shimmerLayout = activity.findViewById(R.id.shimmerLayout);
-                    if (shimmerLayout != null) {
-                        shimmerLayout.stopShimmer();
-                        shimmerLayout.setVisibility(View.GONE);
+                if (holder.getBindingAdapterPosition() == getSnapshots().size()-1) {
+                    if (listener != null) {
+                        listener.onItemsLoaded();
                     }
-                    View mainLinearLayout = activity.findViewById(R.id.mainLinearLayout);
-                    if (mainLinearLayout != null) {
-                        mainLinearLayout.setVisibility(View.VISIBLE);
+                    if (activity != null) {
+                        ShimmerFrameLayout shimmerLayout = activity.findViewById(R.id.shimmerLayout);
+                        if (shimmerLayout != null) {
+                            shimmerLayout.stopShimmer();
+                            shimmerLayout.setVisibility(View.GONE);
+                        }
+                        View mainLinearLayout = activity.findViewById(R.id.mainLinearLayout);
+                        if (mainLinearLayout != null) {
+                            mainLinearLayout.setVisibility(View.VISIBLE);
+                        }
                     }
                 }
             }
@@ -179,6 +195,9 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
             }
             
             if (getItemCount() == 0){
+                if (listener != null) {
+                    listener.onCartEmpty();
+                }
                 ShimmerFrameLayout shimmerLayout = activity.findViewById(R.id.shimmerLayout);
                 if (shimmerLayout != null) {
                     shimmerLayout.stopShimmer();
@@ -196,6 +215,9 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
                 }
             }
             else {
+                if (listener != null) {
+                    listener.onCartHasItems();
+                }
                 View emptyCartImageView = activity.findViewById(R.id.emptyCartImageView);
                 if (emptyCartImageView != null) {
                     emptyCartImageView.setVisibility(View.INVISIBLE);

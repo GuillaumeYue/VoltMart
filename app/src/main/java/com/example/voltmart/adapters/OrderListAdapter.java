@@ -49,21 +49,33 @@ public class OrderListAdapter extends FirestoreRecyclerAdapter<OrderItemModel, O
             // Get the document ID for this specific order item
             String documentId = getSnapshots().getSnapshot(position).getId();
             
-            // Create a new fragment instance for each click with the correct orderId and documentId
-            Bundle bundle = new Bundle();
-            bundle.putInt("orderId", model.getOrderId());
-            bundle.putInt("productId", model.getProductId());
-            bundle.putString("documentId", documentId); // Pass document ID to uniquely identify this order item
-            OrderDetailsFragment fragment = new OrderDetailsFragment();
-            fragment.setArguments(bundle);
-            
-            // Only navigate if fragment is not already added
-            if (!fragment.isAdded()) {
-                activity.getSupportFragmentManager()
-                        .beginTransaction()
-                        .replace(R.id.main_frame_layout, fragment)
-                        .addToBackStack(null)
-                        .commit();
+            // Check if we're in an Activity context (like OrdersListActivity) or Fragment context
+            // If main_frame_layout exists, we're in a Fragment context (MainActivity)
+            View mainFrameLayout = activity.findViewById(R.id.main_frame_layout);
+            if (mainFrameLayout != null) {
+                // Fragment context - navigate to fragment
+                Bundle bundle = new Bundle();
+                bundle.putInt("orderId", model.getOrderId());
+                bundle.putInt("productId", model.getProductId());
+                bundle.putString("documentId", documentId);
+                OrderDetailsFragment fragment = new OrderDetailsFragment();
+                fragment.setArguments(bundle);
+                
+                if (!fragment.isAdded()) {
+                    activity.getSupportFragmentManager()
+                            .beginTransaction()
+                            .replace(R.id.main_frame_layout, fragment)
+                            .addToBackStack(null)
+                            .commit();
+                }
+            } else {
+                // Activity context - show order details in a dialog or Toast
+                android.widget.Toast.makeText(activity, 
+                    "Order: " + model.getName() + "\n" +
+                    "Date: " + new java.text.SimpleDateFormat("dd MMM yyyy").format(model.getTimestamp().toDate()) + "\n" +
+                    "Price: $" + model.getPrice() + "\n" +
+                    "Quantity: " + model.getQuantity(),
+                    android.widget.Toast.LENGTH_LONG).show();
             }
         });
     }

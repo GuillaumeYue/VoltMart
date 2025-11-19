@@ -88,6 +88,7 @@ dependencies {
     implementation("com.google.firebase:firebase-dynamic-links")
     implementation("com.firebaseui:firebase-ui-firestore:8.0.2")
 
+
     // JavaMail（导致 NOTICE.md 冲突的两个库，保留即可，冲突已通过 packaging 解决）
     implementation("com.sun.mail:android-mail:1.6.7")
 

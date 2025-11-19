@@ -30,6 +30,7 @@ public class CategoryFragment extends Fragment {
     TextView labelTextView;
 
     String categoryName;
+    private android.os.Handler categoryCheckHandler;
 
     public CategoryFragment() {
         // Required empty public constructor
@@ -68,45 +69,151 @@ public class CategoryFragment extends Fragment {
         }
         return view;
     }
+    
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        // Clean up handler and adapter
+        if (categoryCheckHandler != null) {
+            categoryCheckHandler.removeCallbacksAndMessages(null);
+        }
+        if (searchProductAdapter != null) {
+            searchProductAdapter.stopListening();
+        }
+    }
 
     private void getProducts(String categoryName){
         if (getActivity() == null) {
             return;
         }
         
-        // Normalize category name to match product category values
-        // Products use lowercase, no spaces (e.g., "phones")
-        // Categories use formatted names (e.g., "Smart Phone")
+        // Prepare all variations to try
         String normalizedCategory = normalizeCategoryName(categoryName);
+        String lowerCategory = categoryName.toLowerCase().trim();
         
-        android.util.Log.d("CategoryFragment", "Searching products for category: " + categoryName + " (normalized: " + normalizedCategory + ")");
+        // Build list of category variations to try (remove duplicates)
+        java.util.List<String> categoriesToTry = new java.util.ArrayList<>();
+        categoriesToTry.add(categoryName); // Original
+        if (!categoriesToTry.contains(lowerCategory)) {
+            categoriesToTry.add(lowerCategory);
+        }
+        if (!categoriesToTry.contains(normalizedCategory)) {
+            categoriesToTry.add(normalizedCategory);
+        }
         
-        // Try exact match first
-        Query query = FirebaseUtil.getProducts().whereEqualTo("category", normalizedCategory);
+        // Also try with space variations for multi-word categories
+        if (categoryName.contains(" ")) {
+            // Try with hyphen
+            String withHyphen = categoryName.toLowerCase().replace(" ", "-");
+            if (!categoriesToTry.contains(withHyphen)) {
+                categoriesToTry.add(withHyphen);
+            }
+            // Try with underscore
+            String withUnderscore = categoryName.toLowerCase().replace(" ", "_");
+            if (!categoriesToTry.contains(withUnderscore)) {
+                categoriesToTry.add(withUnderscore);
+            }
+        }
+        
+        android.util.Log.d("CategoryFragment", "Searching products for category: " + categoryName);
+        android.util.Log.d("CategoryFragment", "Will try variations: " + categoriesToTry);
+        
+        // Try all variations sequentially
+        tryCategoryVariations(categoriesToTry, 0);
+    }
+    
+    /**
+     * Tries category variations sequentially until one works
+     */
+    private void tryCategoryVariations(java.util.List<String> categoriesToTry, int currentIndex) {
+        if (getActivity() == null || currentIndex >= categoriesToTry.size()) {
+            android.util.Log.w("CategoryFragment", "No products found after trying all " + categoriesToTry.size() + " variations");
+            return;
+        }
+        
+        String categoryToTry = categoriesToTry.get(currentIndex);
+        android.util.Log.d("CategoryFragment", "Trying category variation [" + (currentIndex + 1) + "/" + categoriesToTry.size() + "]: " + categoryToTry);
+        
+        // Stop previous adapter if exists and clean up handler
+        if (searchProductAdapter != null) {
+            searchProductAdapter.stopListening();
+        }
+        if (categoryCheckHandler != null) {
+            categoryCheckHandler.removeCallbacksAndMessages(null);
+        }
+        
+        // Create query for this category variation
+        Query query = FirebaseUtil.getProducts().whereEqualTo("category", categoryToTry);
         FirestoreRecyclerOptions<ProductModel> options = new FirestoreRecyclerOptions.Builder<ProductModel>()
                 .setQuery(query, ProductModel.class)
                 .build();
-
+        
         searchProductAdapter = new SearchAdapter(options, getActivity());
         productRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
         productRecyclerView.setAdapter(searchProductAdapter);
         searchProductAdapter.startListening();
         
-        // Log if no products found
+        // Register observer to check if products were found
+        final int index = currentIndex;
+        final boolean[] foundProducts = {false};
+        // Use instance handler for cleanup
+        if (categoryCheckHandler == null) {
+            categoryCheckHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+        }
+        final android.os.Handler handler = categoryCheckHandler;
+        
+        // Set a timeout to check if products were found after a delay
+        Runnable checkTimeout = new Runnable() {
+            @Override
+            public void run() {
+                if (getActivity() == null) {
+                    return;
+                }
+                if (!foundProducts[0] && searchProductAdapter != null) {
+                    int itemCount = searchProductAdapter.getItemCount();
+                    android.util.Log.d("CategoryFragment", "Timeout check: itemCount = " + itemCount + " for category: " + categoryToTry);
+                    if (itemCount == 0) {
+                        if (index < categoriesToTry.size() - 1) {
+                            // No products found, try next variation
+                            android.util.Log.w("CategoryFragment", "No products found for: " + categoryToTry + " after timeout, trying next variation...");
+                            tryCategoryVariations(categoriesToTry, index + 1);
+                        } else {
+                            android.util.Log.w("CategoryFragment", "No products found after trying all " + categoriesToTry.size() + " variations");
+                        }
+                    } else {
+                        foundProducts[0] = true;
+                        android.util.Log.d("CategoryFragment", "Successfully found " + itemCount + " products with category: " + categoryToTry);
+                    }
+                }
+            }
+        };
+        
+        // Check after 1 second to give the query time to complete (reduced for faster response)
+        handler.postDelayed(checkTimeout, 1000);
+        
         searchProductAdapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
             @Override
             public void onItemRangeInserted(int positionStart, int itemCount) {
                 super.onItemRangeInserted(positionStart, itemCount);
-                android.util.Log.d("CategoryFragment", "Products loaded: " + itemCount + " items");
+                if (itemCount > 0 && !foundProducts[0]) {
+                    foundProducts[0] = true;
+                    handler.removeCallbacks(checkTimeout); // Cancel timeout since we found products
+                    android.util.Log.d("CategoryFragment", "Products loaded: " + itemCount + " items with category: " + categoryToTry);
+                }
             }
             
             @Override
             public void onChanged() {
                 super.onChanged();
-                android.util.Log.d("CategoryFragment", "Adapter changed, itemCount: " + searchProductAdapter.getItemCount());
-                if (searchProductAdapter.getItemCount() == 0) {
-                    android.util.Log.w("CategoryFragment", "No products found for category: " + categoryName + " (normalized: " + normalizedCategory + ")");
+                int itemCount = searchProductAdapter.getItemCount();
+                android.util.Log.d("CategoryFragment", "Adapter changed, itemCount: " + itemCount + " for category: " + categoryToTry);
+                
+                if (itemCount > 0 && !foundProducts[0]) {
+                    foundProducts[0] = true;
+                    handler.removeCallbacks(checkTimeout); // Cancel timeout since we found products
+                    android.util.Log.d("CategoryFragment", "Successfully found " + itemCount + " products with category: " + categoryToTry);
                 }
+                // Let the timeout handle trying the next variation to avoid conflicts
             }
         });
     }
@@ -116,31 +223,57 @@ public class CategoryFragment extends Fragment {
      * Examples:
      * "Smart Phone" -> "phones"
      * "Laptop" -> "laptop"
-     * "phones" -> "phones" (already normalized)
+     * "Gaming PC" -> "gamingpc" or "gaming pc"
+     * "TV" -> "tv"
+     * "Headset" -> "headset"
      */
     private String normalizeCategoryName(String categoryName) {
         if (categoryName == null || categoryName.isEmpty()) {
             return "";
         }
         
-        // Convert to lowercase and remove spaces
-        String normalized = categoryName.toLowerCase().trim().replaceAll("\\s+", "");
+        // Convert to lowercase and trim
+        String lower = categoryName.toLowerCase().trim();
         
-        // Handle common mappings
+        // Handle common mappings with special cases
         // "Smart Phone" -> "phones"
-        if (normalized.contains("smart") && normalized.contains("phone")) {
+        if (lower.contains("smart") && lower.contains("phone")) {
             return "phones";
         }
-        if (normalized.equals("phone") || normalized.equals("phones") || normalized.equals("smartphone")) {
+        if (lower.equals("phone") || lower.equals("phones") || lower.equals("smartphone")) {
             return "phones";
         }
         
         // "Laptop" -> "laptop"
-        if (normalized.equals("laptop") || normalized.equals("laptops")) {
+        if (lower.equals("laptop") || lower.equals("laptops")) {
             return "laptop";
         }
         
-        // Return normalized version (lowercase, no spaces)
-        return normalized;
+        // "Gaming PC" -> try "gamingpc" and "gaming pc"
+        if (lower.contains("gaming") && lower.contains("pc")) {
+            // Try both variations
+            return "gamingpc"; // Most likely format
+        }
+        if (lower.equals("gamingpc") || lower.equals("gaming pc")) {
+            return "gamingpc";
+        }
+        
+        // "Headset" -> "headset"
+        if (lower.equals("headset") || lower.equals("headsets")) {
+            return "headset";
+        }
+        
+        // "TV" -> "tv"
+        if (lower.equals("tv") || lower.equals("television") || lower.equals("televisions")) {
+            return "tv";
+        }
+        
+        // For other categories, try both with and without spaces
+        // First try: lowercase with spaces removed
+        String noSpaces = lower.replaceAll("\\s+", "");
+        // This will be tried first in the query
+        
+        // Return normalized version (lowercase, no spaces) as default
+        return noSpaces;
     }
 }
