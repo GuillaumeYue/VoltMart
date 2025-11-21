@@ -37,36 +37,57 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 搜索Fragment
+ * 提供商品搜索功能
+ * 功能包括：
+ * - 实时搜索（用户输入时自动搜索）
+ * - 灵活的关键词匹配（不需要精确匹配）
+ * - 从内存中过滤商品（提高性能）
+ * - 支持搜索商品名称、关键词、分类、描述等
+ */
 public class SearchFragment extends Fragment {
 
-    private RecyclerView productRecyclerView;
-    private SearchProductAdapter searchAdapter;
-    private MaterialSearchBar searchBar;
-    private List<ProductModel> allProducts = new ArrayList<>();
-    private androidx.activity.OnBackPressedCallback backPressedCallback;
-    private String pendingSearchTerm = null; // Store search term if products aren't loaded yet
-    private Handler searchHandler = new Handler(Looper.getMainLooper());
-    private Runnable searchRunnable;
+    // UI组件
+    private RecyclerView productRecyclerView;  // 商品列表RecyclerView
+    private SearchProductAdapter searchAdapter; // 搜索适配器
+    private MaterialSearchBar searchBar;        // 搜索栏
 
+    // 数据
+    private List<ProductModel> allProducts = new ArrayList<>(); // 所有商品列表（从Firestore加载一次）
+
+    // 状态管理
+    private androidx.activity.OnBackPressedCallback backPressedCallback; // 返回按钮回调
+    private String pendingSearchTerm = null;    // 待执行的搜索词（如果商品未加载完成时存储）
+    private Handler searchHandler = new Handler(Looper.getMainLooper()); // 搜索处理Handler
+    private Runnable searchRunnable;             // 搜索任务（用于防抖）
+
+    /**
+     * 创建Fragment视图
+     * 初始化UI组件、设置搜索监听器、加载商品数据
+     */
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_search, container, false);
 
         MainActivity activity = (MainActivity) getActivity();
         if (activity != null) {
-            activity.showSearchBar();
+            activity.showSearchBar(); // 显示搜索栏
         }
 
+        // 初始化RecyclerView
         productRecyclerView = view.findViewById(R.id.productRecyclerView);
         productRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
 
         searchBar = getActivity().findViewById(R.id.searchBar);
 
         if (searchBar != null) {
+            // 设置搜索栏监听器
             searchBar.setOnSearchActionListener(new SimpleOnSearchActionListener() {
                 @Override
                 public void onSearchStateChanged(boolean enabled) {
                     super.onSearchStateChanged(enabled);
+                    // 搜索栏关闭时返回首页
                     if (!enabled && activity != null) {
                         navigateBackToHome();
                     }
@@ -75,6 +96,7 @@ public class SearchFragment extends Fragment {
                 @Override
                 public void onSearchConfirmed(CharSequence text) {
                     super.onSearchConfirmed(text);
+                    // 获取搜索文本并执行搜索
                     String searchText = "";
                     if (text != null && text.length() > 0) {
                         searchText = text.toString().trim();
@@ -87,24 +109,26 @@ public class SearchFragment extends Fragment {
                 @Override
                 public void onButtonClicked(int buttonCode) {
                     super.onButtonClicked(buttonCode);
+                    // 点击搜索栏按钮时返回首页
                     if (activity != null) {
                         navigateBackToHome();
                     }
                 }
             });
             
-            // Add real-time search as user types
+            // 设置实时搜索（用户输入时自动搜索）
             setupRealTimeSearch();
         }
 
-        // Load all products once when fragment is created
+        // Fragment创建时加载所有商品（只加载一次）
         loadAllProducts();
 
         return view;
     }
 
     /**
-     * Load all products from Firestore once
+     * 从Firestore加载所有商品
+     * 只加载一次，后续搜索在内存中进行
      */
     private void loadAllProducts() {
         FirebaseUtil.getProducts().get()

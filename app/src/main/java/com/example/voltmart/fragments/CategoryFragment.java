@@ -22,45 +22,64 @@ import com.example.voltmart.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.firebase.firestore.Query;
 
+/**
+ * 分类商品Fragment
+ * 显示指定分类下的所有商品
+ * 功能包括：
+ * - 根据分类名称查询商品
+ * - 支持多种分类名称格式（原始、小写、规范化等）
+ * - 自动尝试不同的分类名称变体直到找到商品
+ */
 public class CategoryFragment extends Fragment {
 
-    RecyclerView productRecyclerView;
-    SearchAdapter searchProductAdapter;
-    ImageView backBtn;
-    TextView labelTextView;
+    // UI组件
+    RecyclerView productRecyclerView;  // 商品列表RecyclerView
+    SearchAdapter searchProductAdapter; // 商品适配器
+    ImageView backBtn;                 // 返回按钮
+    TextView labelTextView;            // 分类名称标签
 
-    String categoryName;
-    private android.os.Handler categoryCheckHandler;
+    // 数据
+    String categoryName;               // 分类名称
+    private android.os.Handler categoryCheckHandler; // 分类检查Handler（用于超时检查）
 
+    /**
+     * 无参构造函数
+     * Fragment需要无参构造函数
+     */
     public CategoryFragment() {
         // Required empty public constructor
     }
 
 
+    /**
+     * 创建Fragment视图
+     * 初始化UI组件并加载分类商品
+     */
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
+        // 填充Fragment布局
         View view =  inflater.inflate(R.layout.fragment_category, container, false);
         labelTextView = view.findViewById(R.id.labelTextView);
         productRecyclerView = view.findViewById(R.id.productRecyclerView);
         backBtn = view.findViewById(R.id.backBtn);
 
-        // Get category name from arguments with null safety
+        // 从参数中获取分类名称（带空值安全检查）
         Bundle args = getArguments();
         if (args != null) {
             categoryName = args.getString("categoryName", "Electronics");
         } else {
-            categoryName = "Electronics";
+            categoryName = "Electronics"; // 默认分类
         }
 
-        labelTextView.setText(categoryName);
-        getProducts(categoryName);
+        labelTextView.setText(categoryName); // 显示分类名称
+        getProducts(categoryName); // 获取该分类的商品
 
         MainActivity activity = (MainActivity) getActivity();
         if (activity != null) {
-            activity.hideSearchBar();
+            activity.hideSearchBar(); // 隐藏搜索栏
 
+            // 设置返回按钮点击事件
             backBtn.setOnClickListener(v -> {
                 if (activity != null) {
                     activity.onBackPressed();
@@ -70,18 +89,27 @@ public class CategoryFragment extends Fragment {
         return view;
     }
     
+    /**
+     * Fragment视图销毁时的清理方法
+     * 清理Handler和停止适配器监听
+     */
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        // Clean up handler and adapter
+        // 清理Handler和适配器
         if (categoryCheckHandler != null) {
-            categoryCheckHandler.removeCallbacksAndMessages(null);
+            categoryCheckHandler.removeCallbacksAndMessages(null); // 移除所有回调
         }
         if (searchProductAdapter != null) {
-            searchProductAdapter.stopListening();
+            searchProductAdapter.stopListening(); // 停止适配器监听
         }
     }
 
+    /**
+     * 获取指定分类的商品
+     * 尝试多种分类名称格式，直到找到商品
+     * @param categoryName 分类名称
+     */
     private void getProducts(String categoryName){
         if (getActivity() == null) {
             return;

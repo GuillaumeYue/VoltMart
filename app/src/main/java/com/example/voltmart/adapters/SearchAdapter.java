@@ -34,15 +34,34 @@ import com.squareup.picasso.Picasso;
 
 import java.text.DecimalFormat;
 
+/**
+ * 搜索适配器
+ * 用于在RecyclerView中显示搜索结果商品列表
+ * 继承自FirestoreRecyclerAdapter，自动同步Firestore数据
+ * 主要用于分类Fragment和搜索结果展示
+ */
 public class SearchAdapter extends FirestoreRecyclerAdapter<ProductModel, SearchAdapter.SearchViewHolder> {
 
-    private Context context;
-    private AppCompatActivity activity;
+    private Context context;           // 上下文
+    private AppCompatActivity activity; // 活动实例
+
+    /**
+     * 构造函数
+     * @param options Firestore查询选项
+     * @param context 上下文
+     */
     public SearchAdapter(@NonNull FirestoreRecyclerOptions<ProductModel> options, Context context) {
         super(options);
         this.context = context;
     }
 
+    /**
+     * 绑定ViewHolder数据
+     * 将商品数据绑定到ViewHolder的UI组件上
+     * @param holder ViewHolder实例
+     * @param position 位置
+     * @param product 商品数据模型
+     */
     @Override
     protected void onBindViewHolder(@NonNull SearchAdapter.SearchViewHolder holder, int position, @NonNull ProductModel product) {
         holder.productNameTextView.setText(product.getName());

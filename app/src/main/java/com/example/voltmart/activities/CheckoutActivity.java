@@ -63,63 +63,102 @@ import java.util.Map;
 
 import cn.pedant.SweetAlert.SweetAlertDialog;
 
+/**
+ * 结账活动页面
+ * 处理订单结算流程，包括：
+ * - 计算小计、GST（5%）、QST（9.975%）、配送费和总价
+ * - 收集用户信息（姓名、邮箱、电话、地址）
+ * - 选择支付方式（信用卡/货到付款）
+ * - 使用Stripe处理信用卡支付
+ * - 使用Google Places API选择地址
+ * - 创建订单并更新库存
+ */
 public class CheckoutActivity extends AppCompatActivity {
 
-    TextView subtotalTextView, gstTextView, qstTextView, deliveryTextView, totalTextView, stockErrorTextView;
-    Button checkoutBtn;
-    ImageView backBtn;
-    ImageButton locationPickerBtn;
-    RadioGroup paymentMethodRadioGroup;
-    RadioButton cardPaymentRadio, cashOnDeliveryRadio;
-    LinearLayout cardDetailsLayout;
-    CardInputWidget cardInputWidget;
-
-    SweetAlertDialog dialog;
-
-    int subTotal, gst, qst, delivery, total, count=0;
-    volatile boolean adequateStock = true, done = false;
-
-    EditText nameEditText, emailEditText, phoneEditText, addressEditText, commentEditText;
-    String name, email, phone, address, comment;
+    // UI组件 - 价格显示
+    TextView subtotalTextView;      // 小计显示
+    TextView gstTextView;          // GST（商品及服务税，5%）显示
+    TextView qstTextView;          // QST（魁北克销售税，9.975%）显示
+    TextView deliveryTextView;     // 配送费显示
+    TextView totalTextView;        // 总价显示
+    TextView stockErrorTextView;   // 库存错误提示
+    Button checkoutBtn;            // 结账按钮
+    ImageView backBtn;             // 返回按钮
+    ImageButton locationPickerBtn; // 地址选择按钮
     
-    private static final int AUTOCOMPLETE_REQUEST_CODE = 1;
-    private static final int LOCATION_PERMISSION_REQUEST_CODE = 2;
-    private FusedLocationProviderClient fusedLocationClient;
+    // 支付方式相关UI
+    RadioGroup paymentMethodRadioGroup;  // 支付方式单选组
+    RadioButton cardPaymentRadio;        // 信用卡支付选项
+    RadioButton cashOnDeliveryRadio;     // 货到付款选项
+    LinearLayout cardDetailsLayout;      // 信用卡详情布局
+    CardInputWidget cardInputWidget;     // Stripe信用卡输入组件
+
+    SweetAlertDialog dialog;  // 进度对话框
+
+    // 价格计算变量
+    int subTotal;              // 小计
+    int gst;                   // GST税额（5%）
+    int qst;                   // QST税额（9.975%）
+    int delivery;              // 配送费
+    int total;                 // 总价
+    int count=0;               // 计数器
+    volatile boolean adequateStock = true;  // 库存是否充足（volatile确保多线程可见性）
+    volatile boolean done = false;         // 是否完成（volatile确保多线程可见性）
+
+    // 用户信息输入框
+    EditText nameEditText;     // 姓名输入框
+    EditText emailEditText;    // 邮箱输入框
+    EditText phoneEditText;    // 电话输入框
+    EditText addressEditText;  // 地址输入框
+    EditText commentEditText;  // 备注输入框
+    String name, email, phone, address, comment;  // 用户信息字符串
     
-    // Stripe
-    // NOTE: Replace with your actual Stripe publishable key from https://dashboard.stripe.com/apikeys
-    // Test key format: pk_test_...
-    // Live key format: pk_live_...
+    // Google Places API相关
+    private static final int AUTOCOMPLETE_REQUEST_CODE = 1;      // 地址自动完成请求码
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 2; // 位置权限请求码
+    private FusedLocationProviderClient fusedLocationClient;     // 位置服务客户端
+    
+    // Stripe支付相关
+    // 注意：请从 https://dashboard.stripe.com/apikeys 获取您的实际Stripe发布密钥
+    // 测试密钥格式：pk_test_...
+    // 生产密钥格式：pk_live_...
     private static final String STRIPE_PUBLISHABLE_KEY = "pk_test_51SUYMgIjjD15pVReVOPaFvkmwrKx9MNX3pTXrKPcLsy77jxoPV5ctVi11BOiAVqX0vRfGG8uRtVpSg2PdiYjN0Ru003RwUw0vC";
-    private Stripe stripe;
-    private String selectedPaymentMethod = "card"; // "card" or "cash"
+    private Stripe stripe;                    // Stripe支付客户端
+    private String selectedPaymentMethod = "card"; // 选中的支付方式："card"（信用卡）或"cash"（货到付款）
 
-    final int[] prevOrderId = new int[1];
-    final int[] countOfOrderedItems = new int[1];
-    final int[] priceOfOrders = new int[1];
+    // 订单相关数组（使用数组包装以便在内部类中修改）
+    final int[] prevOrderId = new int[1];           // 上一个订单ID
+    final int[] countOfOrderedItems = new int[1];  // 已订购商品数量
+    final int[] priceOfOrders = new int[1];       // 订单总价
 
-    final List<String>[] productDocId = new ArrayList[1];
-    final List<Integer>[] oldStock = new ArrayList[1];
-    final List<Integer>[] quan = new ArrayList[1];
-    final List<String>[] lessStock = new ArrayList[1];
+    // 产品相关列表（使用数组包装以便在内部类中修改）
+    final List<String>[] productDocId = new ArrayList[1];  // 产品文档ID列表
+    final List<Integer>[] oldStock = new ArrayList[1];      // 原库存列表
+    final List<Integer>[] quan = new ArrayList[1];         // 购买数量列表
+    final List<String>[] lessStock = new ArrayList[1];     // 库存不足的产品列表
 
-    final List<String>[] cartDocument = new ArrayList[1];
-    final List<String>[] productName = new ArrayList[1];
-    final List<Integer>[] productPrice = new ArrayList[1];
-    final List<Integer>[] productQuantity = new ArrayList[1];
+    // 购物车相关列表（使用数组包装以便在内部类中修改）
+    final List<String>[] cartDocument = new ArrayList[1];   // 购物车文档ID列表
+    final List<String>[] productName = new ArrayList[1];    // 产品名称列表
+    final List<Integer>[] productPrice = new ArrayList[1];  // 产品价格列表
+    final List<Integer>[] productQuantity = new ArrayList[1]; // 产品数量列表
 
+    /**
+     * 活动创建时的初始化方法
+     * 初始化UI组件、Stripe支付、Google Places API等
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
+        EdgeToEdge.enable(this); // 启用边缘到边缘显示
         
-        // Initialize Stripe PaymentConfiguration BEFORE setContentView
-        // This is required because CardInputWidget accesses it during layout inflation
+        // 在setContentView之前初始化Stripe PaymentConfiguration
+        // 这是必需的，因为CardInputWidget在布局填充期间会访问它
         if (STRIPE_PUBLISHABLE_KEY == null || STRIPE_PUBLISHABLE_KEY.isEmpty() || !STRIPE_PUBLISHABLE_KEY.startsWith("pk_")) {
             Log.e("Stripe", "Invalid Stripe publishable key format. Key must start with 'pk_test_' or 'pk_live_'");
             Toast.makeText(this, "Payment system configuration error", Toast.LENGTH_LONG).show();
         }
-        PaymentConfiguration.init(this, STRIPE_PUBLISHABLE_KEY);
+        PaymentConfiguration.init(this, STRIPE_PUBLISHABLE_KEY); // 初始化Stripe支付配置
         Log.d("Stripe", "Stripe PaymentConfiguration initialized with key: " + STRIPE_PUBLISHABLE_KEY.substring(0, Math.min(20, STRIPE_PUBLISHABLE_KEY.length())) + "...");
         
         setContentView(R.layout.activity_checkout);

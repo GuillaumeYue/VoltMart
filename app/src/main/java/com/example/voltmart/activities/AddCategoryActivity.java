@@ -39,20 +39,35 @@ import java.util.Map;
 
 import cn.pedant.SweetAlert.SweetAlertDialog;
 
+/**
+ * 添加分类活动页面
+ * 管理员添加新商品分类到系统
+ * 功能包括：
+ * - 输入分类信息（ID、名称、描述、颜色）
+ * - 上传分类图标
+ * - 保存分类到Firebase
+ */
 public class AddCategoryActivity extends AppCompatActivity {
 
-    TextInputEditText idEditText, nameEditText, descEditText, colorEditText;
-    Button imageBtn, addCategoryBtn;
-    ImageView backBtn, categoryImageView;
-    TextView removeImageBtn;
+    // UI组件 - 输入框
+    TextInputEditText idEditText;      // 分类ID输入框
+    TextInputEditText nameEditText;    // 分类名称输入框
+    TextInputEditText descEditText;    // 分类描述输入框
+    TextInputEditText colorEditText;   // 分类颜色输入框
+    Button imageBtn;                   // 选择图片按钮
+    Button addCategoryBtn;             // 添加分类按钮
+    ImageView backBtn;                 // 返回按钮
+    ImageView categoryImageView;       // 分类图标预览
+    TextView removeImageBtn;            // 移除图片按钮
 
-    String categoryImage;
-    String productName;
-    int categoryId = 1; // Initialize with default value
-    Context context = this;
-    boolean imageUploaded = false;
+    // 数据
+    String categoryImage;  // 分类图标URL
+    String productName;    // 产品名称（可能未使用）
+    int categoryId = 1;     // 分类ID（初始化为默认值1）
+    Context context = this; // 上下文
+    boolean imageUploaded = false; // 图片是否已上传
 
-    SweetAlertDialog dialog;
+    SweetAlertDialog dialog; // 进度对话框
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

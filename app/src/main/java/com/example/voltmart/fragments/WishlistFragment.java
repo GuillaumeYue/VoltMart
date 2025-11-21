@@ -19,36 +19,58 @@ import com.example.voltmart.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.firebase.firestore.Query;
 
+/**
+ * 愿望单Fragment
+ * 显示用户添加到愿望单的商品列表
+ * 功能包括：
+ * - 显示愿望单商品
+ * - 从愿望单移除商品
+ * - 将愿望单商品添加到购物车
+ */
 public class WishlistFragment extends Fragment {
 
-    RecyclerView productRecyclerView;
-    WishlistProductAdapter productAdapter;
-    ImageView backBtn;
+    // UI组件
+    RecyclerView productRecyclerView;  // 愿望单商品列表RecyclerView
+    WishlistProductAdapter productAdapter; // 愿望单商品适配器
+    ImageView backBtn;                 // 返回按钮
 
+    /**
+     * 无参构造函数
+     * Fragment需要无参构造函数
+     */
     public WishlistFragment() {
         // Required empty public constructor
     }
 
-
+    /**
+     * 创建Fragment视图
+     * 初始化UI组件并加载愿望单商品
+     */
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_wishlist, container, false);
 
         MainActivity activity = (MainActivity) getActivity();
-        activity.hideSearchBar();
+        activity.hideSearchBar(); // 隐藏搜索栏
 
+        // 初始化UI组件
         productRecyclerView = view.findViewById(R.id.wishlistRecyclerView);
         backBtn = view.findViewById(R.id.backBtn);
+        // 设置返回按钮点击事件
         backBtn.setOnClickListener(v -> {
             activity.onBackPressed();
         });
 
-        initProducts();
+        initProducts(); // 初始化愿望单商品
 
         return view;
     }
 
+    /**
+     * 初始化愿望单商品
+     * 从Firebase加载用户的愿望单商品并显示
+     */
     private void initProducts() {
         Query query = FirebaseUtil.getWishlistItems().orderBy("timestamp", Query.Direction.DESCENDING);
         FirestoreRecyclerOptions<CartItemModel> options = new FirestoreRecyclerOptions.Builder<CartItemModel>()

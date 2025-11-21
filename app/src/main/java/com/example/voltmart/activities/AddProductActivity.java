@@ -48,24 +48,46 @@ import java.util.Map;
 
 import cn.pedant.SweetAlert.SweetAlertDialog;
 
+/**
+ * 添加商品活动页面
+ * 管理员添加新商品到系统
+ * 功能包括：
+ * - 输入商品信息（ID、名称、分类、描述、规格、库存、价格、折扣）
+ * - 上传商品图片
+ * - 生成商品分享链接
+ * - 保存商品到Firebase
+ */
 public class AddProductActivity extends AppCompatActivity {
 
-    TextInputEditText idEditText, nameEditText, descEditText, specEditText, stockEditText, priceEditText, discountEditText;
-    Button imageBtn, addProductBtn;
-    ImageView backBtn, productImageView;
-    TextView removeImageBtn;
+    // UI组件 - 输入框
+    TextInputEditText idEditText;        // 商品ID输入框
+    TextInputEditText nameEditText;      // 商品名称输入框
+    TextInputEditText descEditText;      // 商品描述输入框
+    TextInputEditText specEditText;      // 商品规格输入框
+    TextInputEditText stockEditText;     // 库存输入框
+    TextInputEditText priceEditText;     // 价格输入框
+    TextInputEditText discountEditText;  // 折扣输入框
+    Button imageBtn;                     // 选择图片按钮
+    Button addProductBtn;                // 添加商品按钮
+    ImageView backBtn;                    // 返回按钮
+    ImageView productImageView;          // 商品图片预览
+    TextView removeImageBtn;              // 移除图片按钮
 
-    AutoCompleteTextView categoryDropDown;
-    ArrayAdapter<String> arrayAdapter;
-    String[] categories;
-    String category, productImage, shareLink;
-    String productName;
-    int productId = 1; // Initialize with default value
-    Context context = this;
-    boolean imageUploaded = false;
+    // UI组件 - 分类下拉框
+    AutoCompleteTextView categoryDropDown; // 分类下拉选择框
+    ArrayAdapter<String> arrayAdapter;     // 分类适配器
+    String[] categories;                   // 分类数组
 
-    //    ProgressDialog dialog;
-    SweetAlertDialog dialog;
+    // 数据
+    String category;          // 选中的分类
+    String productImage;      // 商品图片URL
+    String shareLink;         // 商品分享链接
+    String productName;       // 商品名称
+    int productId = 1;        // 商品ID（初始化为默认值1）
+    Context context = this;   // 上下文
+    boolean imageUploaded = false; // 图片是否已上传
+
+    SweetAlertDialog dialog;  // 进度对话框
 
 
     @Override

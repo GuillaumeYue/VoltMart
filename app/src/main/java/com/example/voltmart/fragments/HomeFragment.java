@@ -35,33 +35,48 @@ import org.imaginativeworld.whynotimagecarousel.ImageCarousel;
 import org.imaginativeworld.whynotimagecarousel.model.CarouselItem;
 
 /**
- * HomeFragment – 显示主页内容（无 shimmer，基础控件版）
+ * 首页Fragment
+ * 显示应用的主页内容，包括：
+ * - 横幅轮播图（Banner）
+ * - 商品分类列表
+ * - 商品列表
+ * 使用Shimmer效果显示加载状态
  */
 public class HomeFragment extends Fragment {
 
-    RecyclerView categoryRecyclerView, productRecyclerView;
-    MaterialSearchBar searchBar;
-    ImageCarousel carousel;
-    ShimmerFrameLayout shimmerFrameLayout;
-    LinearLayout mainLinearLayout;
+    // UI组件
+    RecyclerView categoryRecyclerView;  // 分类列表RecyclerView
+    RecyclerView productRecyclerView;    // 商品列表RecyclerView
+    MaterialSearchBar searchBar;        // 搜索栏
+    ImageCarousel carousel;             // 横幅轮播图
+    ShimmerFrameLayout shimmerFrameLayout; // Shimmer加载效果布局
+    LinearLayout mainLinearLayout;      // 主内容布局
 
-    CategoryAdapter categoryAdapter;
-    ProductAdapter productAdapter;
+    // 适配器
+    CategoryAdapter categoryAdapter;  // 分类适配器
+    ProductAdapter productAdapter;     // 商品适配器
 
 //    TextView textView;
 
+    /**
+     * 无参构造函数
+     * Fragment需要无参构造函数
+     */
     public HomeFragment() {
         // Required empty public constructor
     }
 
+    /**
+     * 创建Fragment视图
+     * 初始化UI组件并加载数据
+     */
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
 
-        // Inflate the layout for this fragment
+        // 填充Fragment布局
         View view = inflater.inflate(R.layout.fragment_home, container, false);
         searchBar = getActivity().findViewById(R.id.searchBar);
-//        textView = view.findViewById(R.id.textView);
         categoryRecyclerView = view.findViewById(R.id.categoryRecyclerView);
         productRecyclerView = view.findViewById(R.id.productRecyclerView);
         carousel = view.findViewById(R.id.carousel);
@@ -69,25 +84,27 @@ public class HomeFragment extends Fragment {
         mainLinearLayout = view.findViewById(R.id.mainLinearLayout);
 
         MainActivity activity = (MainActivity) getActivity();
-        activity.showSearchBar();
-        shimmerFrameLayout.startShimmer();
+        activity.showSearchBar(); // 显示搜索栏
+        shimmerFrameLayout.startShimmer(); // 启动Shimmer加载效果
 
-//        textView.setOnClickListener(v -> {
-//            startActivity(new Intent(getActivity(), AdminActivity.class));
-//        });
-
-        initCarousel();
-        initCategories();
-        initProducts();
+        // 初始化各个组件
+        initCarousel();    // 初始化横幅轮播图
+        initCategories();  // 初始化分类列表
+        initProducts();    // 初始化商品列表
 
         return view;
     }
 
+    /**
+     * 初始化横幅轮播图
+     * 从Firebase获取横幅数据并添加到轮播图中
+     */
     private void initCarousel() {
         FirebaseUtil.getBanner().orderBy("bannerId").get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
             @Override
             public void onComplete(@NonNull Task<QuerySnapshot> task) {
                 if (task.isSuccessful()) {
+                    // 遍历所有横幅文档，添加到轮播图
                     for (QueryDocumentSnapshot document : task.getResult()) {
                         carousel.addData(new CarouselItem(document.get("bannerImage").toString()));
                     }

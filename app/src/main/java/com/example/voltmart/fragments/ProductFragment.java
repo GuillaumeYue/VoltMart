@@ -44,27 +44,50 @@ import com.squareup.picasso.Picasso;
 
 import java.text.DecimalFormat;
 
+/**
+ * 商品详情Fragment
+ * 显示商品的详细信息，包括：
+ * - 商品图片、名称、价格、描述、规格
+ * - 商品评分和评论
+ * - 添加到购物车和愿望单功能
+ * - 分享功能
+ * - 相似商品推荐
+ */
 public class ProductFragment extends Fragment {
-    ImageView productImage, backBtn, shareBtn;
-    TextView productName, productDescription, productSpec;
-    TextView productPrice, originalPrice, discountPercentage;
-    TextView ratingTextView, noOfRatingTextView;
-    Button addToCartBtn;
-    MaterialCardView wishlistBtn;
-    ImageView wishlistImageView;
-    RatingBar ratingBar;
+    // UI组件 - 商品信息
+    ImageView productImage;        // 商品图片
+    ImageView backBtn;             // 返回按钮
+    ImageView shareBtn;            // 分享按钮
+    TextView productName;          // 商品名称
+    TextView productDescription;  // 商品描述
+    TextView productSpec;          // 商品规格
+    TextView productPrice;         // 现价
+    TextView originalPrice;        // 原价
+    TextView discountPercentage;   // 折扣百分比
+    TextView ratingTextView;       // 评分显示
+    TextView noOfRatingTextView;   // 评分人数显示
+    Button addToCartBtn;           // 添加到购物车按钮
+    MaterialCardView wishlistBtn;  // 愿望单按钮
+    ImageView wishlistImageView;  // 愿望单图标
+    RatingBar ratingBar;           // 评分条
 
-    LottieAnimationView wishlistLottie, cartLottie;
-    ShimmerFrameLayout shimmerFrameLayout;
-    RecyclerView reviewRecyclerView, similarProductRecyclerView;
-    ReviewAdapter reviewAdapter;
-    ProductAdapter similarProductAdapter;
-    LinearLayout mainLinearlayout;
+    // UI组件 - 动画和加载
+    LottieAnimationView wishlistLottie;  // 愿望单动画
+    LottieAnimationView cartLottie;      // 购物车动画
+    ShimmerFrameLayout shimmerFrameLayout; // Shimmer加载效果
 
-    int productId;
-    boolean wishlisted = false;
+    // UI组件 - 列表
+    RecyclerView reviewRecyclerView;        // 评论列表
+    RecyclerView similarProductRecyclerView; // 相似商品列表
+    ReviewAdapter reviewAdapter;            // 评论适配器
+    ProductAdapter similarProductAdapter;   // 相似商品适配器
+    LinearLayout mainLinearlayout;          // 主内容布局
 
-    ProductModel currentProduct = new ProductModel();
+    // 数据
+    int productId;              // 商品ID
+    boolean wishlisted = false;  // 是否已添加到愿望单
+
+    ProductModel currentProduct = new ProductModel(); // 当前商品数据模型
 
     public ProductFragment() {
         // Required empty public constructor

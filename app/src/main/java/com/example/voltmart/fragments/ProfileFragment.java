@@ -32,55 +32,81 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.UserProfileChangeRequest;
 import com.google.firebase.firestore.Query;
 
+/**
+ * 个人资料Fragment
+ * 显示用户个人信息和订单历史
+ * 功能包括：
+ * - 显示用户名称
+ * - 编辑用户名称
+ * - 显示订单历史
+ * - 退出登录
+ */
 public class ProfileFragment extends Fragment {
-    RecyclerView orderRecyclerView;
-    OrderListAdapter orderAdapter;
-    LinearLayout logoutBtn;
-    TextView userNameTextView;
-    ImageView editNameBtn;
+    // UI组件
+    RecyclerView orderRecyclerView;  // 订单列表RecyclerView
+    OrderListAdapter orderAdapter;   // 订单列表适配器
+    LinearLayout logoutBtn;          // 退出登录按钮
+    TextView userNameTextView;       // 用户名称显示
+    ImageView editNameBtn;           // 编辑名称按钮
 
+    /**
+     * 无参构造函数
+     * Fragment需要无参构造函数
+     */
     public ProfileFragment() {
         // Required empty public constructor
     }
 
+    /**
+     * 创建Fragment视图
+     * 初始化UI组件并加载用户信息和订单数据
+     */
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view =  inflater.inflate(R.layout.fragment_profile, container, false);
+        // 初始化UI组件
         orderRecyclerView = view.findViewById(R.id.orderRecyclerView);
         logoutBtn = view.findViewById(R.id.logoutBtn);
         userNameTextView = view.findViewById(R.id.userNameTextView);
         editNameBtn = view.findViewById(R.id.editNameBtn);
 
-        updateUserNameDisplay();
+        updateUserNameDisplay(); // 更新用户名称显示
 
-        // Edit name button click listener
+        // 设置编辑名称按钮点击事件
         editNameBtn.setOnClickListener(v -> {
             if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-                showEditNameDialog();
+                showEditNameDialog(); // 显示编辑名称对话框
             } else {
+                // 用户未登录，提示需要登录
                 Toast.makeText(getActivity(), "Please login to edit your profile", Toast.LENGTH_SHORT).show();
             }
         });
         
+        // 设置退出登录按钮点击事件
         logoutBtn.setOnClickListener(v -> {
-            FirebaseAuth.getInstance().signOut();
+            FirebaseAuth.getInstance().signOut(); // 退出登录
+            // 跳转到启动页面，清除所有活动栈
             Intent intent = new Intent(getActivity(), SplashActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);
         });
         
-        // Only get order products if user is logged in
+        // 只有用户已登录时才获取订单数据
         if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-            getOrderProducts();
+            getOrderProducts(); // 获取订单列表
         }
 
         MainActivity activity = (MainActivity) getActivity();
-        activity.hideSearchBar();
+        activity.hideSearchBar(); // 隐藏搜索栏
 
         return view;
     }
 
+    /**
+     * 更新用户名称显示
+     * 根据用户登录状态显示不同的名称
+     */
     private void updateUserNameDisplay() {
         // Check if user is logged in
         if (FirebaseAuth.getInstance().getCurrentUser() != null) {

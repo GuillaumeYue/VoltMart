@@ -43,24 +43,44 @@ import java.util.List;
 
 import cn.pedant.SweetAlert.SweetAlertDialog;
 
+/**
+ * 修改横幅活动页面
+ * 管理员修改现有横幅的信息
+ * 功能包括：
+ * - 选择要修改的横幅
+ * - 修改横幅图片
+ * - 修改横幅描述
+ * - 修改横幅状态（Live/Not Live）
+ * - 更新横幅到Firebase
+ */
 public class ModifyBannerActivity extends AppCompatActivity {
 
-    LinearLayout detailsLinearLayout;
-    TextInputEditText descEditText;
-    Button imageBtn, modifyBannerBtn;
-    ImageView backBtn, bannerImageView;
-    TextView removeImageBtn;
+    // UI组件
+    LinearLayout detailsLinearLayout;    // 详情布局
+    TextInputEditText descEditText;      // 描述输入框
+    Button imageBtn;                     // 选择图片按钮
+    Button modifyBannerBtn;              // 修改横幅按钮
+    ImageView backBtn;                   // 返回按钮
+    ImageView bannerImageView;           // 横幅图片预览
+    TextView removeImageBtn;              // 移除图片按钮
 
-    AutoCompleteTextView idDropDown, statusDropDown;
-    ArrayAdapter<String> idAdapter, statusAdapter;
-    BannerModel currBanner;
-    String status, docId, bannerImage;
-    Uri imageUri;
-    int bannerId;
-    Context context = this;
-    boolean imageUploaded = true;
+    // UI组件 - 下拉框
+    AutoCompleteTextView idDropDown;     // 横幅ID下拉选择框
+    AutoCompleteTextView statusDropDown; // 状态下拉选择框（Live/Not Live）
+    ArrayAdapter<String> idAdapter;      // ID适配器
+    ArrayAdapter<String> statusAdapter;  // 状态适配器
 
-    SweetAlertDialog dialog;
+    // 数据
+    BannerModel currBanner;  // 当前横幅数据模型
+    String status;           // 横幅状态
+    String docId;            // 横幅文档ID
+    String bannerImage;      // 横幅图片URL
+    Uri imageUri;            // 图片URI
+    int bannerId;            // 横幅ID
+    Context context = this;  // 上下文
+    boolean imageUploaded = true; // 图片是否已上传（默认为true，因为可能不修改图片）
+
+    SweetAlertDialog dialog; // 进度对话框
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

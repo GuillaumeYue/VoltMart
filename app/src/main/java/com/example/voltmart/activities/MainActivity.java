@@ -39,35 +39,55 @@ import com.google.firebase.firestore.QuerySnapshot;
 import com.mancj.materialsearchbar.MaterialSearchBar;
 import com.mancj.materialsearchbar.SimpleOnSearchActionListener;
 
+/**
+ * 主活动页面
+ * 应用程序的主入口，管理底部导航和各个Fragment的切换
+ * 功能包括：
+ * - 底部导航栏管理（首页、购物车、愿望单、个人资料）
+ * - 搜索功能
+ * - 购物车徽章显示
+ * - 深度链接处理
+ */
 public class MainActivity extends AppCompatActivity {
 
-    BottomNavigationView bottomNavigationView;
-    HomeFragment homeFragment;
-    CartFragment cartFragment;
-    SearchFragment searchFragment;
-    WishlistFragment wishlistFragment;
-    ProfileFragment profileFragment;
-    LinearLayout searchLinearLayout;
-    MaterialSearchBar searchBar;
+    // UI组件
+    BottomNavigationView bottomNavigationView;  // 底部导航栏
+    LinearLayout searchLinearLayout;            // 搜索栏布局
+    MaterialSearchBar searchBar;                // 搜索栏
 
-    FragmentManager fm;
-    FragmentTransaction transaction;
+    // Fragment实例
+    HomeFragment homeFragment;      // 首页Fragment
+    CartFragment cartFragment;      // 购物车Fragment
+    SearchFragment searchFragment;  // 搜索Fragment
+    WishlistFragment wishlistFragment; // 愿望单Fragment
+    ProfileFragment profileFragment;   // 个人资料Fragment
 
+    // Fragment管理
+    FragmentManager fm;           // Fragment管理器
+    FragmentTransaction transaction; // Fragment事务
+
+    /**
+     * 活动创建时的初始化方法
+     * 初始化所有Fragment、设置底部导航、搜索栏和深度链接处理
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
+        EdgeToEdge.enable(this); // 启用边缘到边缘显示
         setContentView(R.layout.activity_main);
 
+        // 初始化UI组件
         searchLinearLayout = findViewById(R.id.linearLayout);
         searchBar = findViewById(R.id.searchBar);
 
+        // 创建所有Fragment实例
         homeFragment = new HomeFragment();
         cartFragment = new CartFragment();
         wishlistFragment = new WishlistFragment();
         profileFragment = new ProfileFragment();
         searchFragment = new SearchFragment();
 
+        // 设置底部导航栏
         bottomNavigationView = findViewById(R.id.bottom_navigation);
         bottomNavigationView.setOnItemSelectedListener(new NavigationBarView.OnItemSelectedListener() {
             @Override
@@ -75,43 +95,46 @@ public class MainActivity extends AppCompatActivity {
                 fm = getSupportFragmentManager();
                 transaction = fm.beginTransaction();
 
+                // 根据选中的导航项切换Fragment
                 if (item.getItemId() == R.id.home) {
+                    // 首页：清空返回栈并显示首页
                     fm.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
-//                    transaction.setCustomAnimations(R.anim.enter_from_right, R.anim.exit_to_left, R.anim.enter_from_left, R.anim.exit_to_right);
                     transaction.replace(R.id.main_frame_layout, homeFragment, "home");
                 } else if (item.getItemId() == R.id.cart) {
+                    // 购物车：如果未添加则添加并加入返回栈
                     if (!cartFragment.isAdded()) {
-//                        transaction.setCustomAnimations(R.anim.enter_from_right, R.anim.exit_to_left, R.anim.enter_from_left, R.anim.exit_to_right);
                         transaction.replace(R.id.main_frame_layout, cartFragment, "cart");
                         transaction.addToBackStack(null);
                     }
                 } else if (item.getItemId() == R.id.wishlist) {
+                    // 愿望单：如果未添加则添加并加入返回栈
                     if (!wishlistFragment.isAdded()) {
-//                        transaction.setCustomAnimations(R.anim.enter_from_right, R.anim.exit_to_left, R.anim.enter_from_left, R.anim.exit_to_right);
                         transaction.replace(R.id.main_frame_layout, wishlistFragment, "wishlist");
                         transaction.addToBackStack(null);
                     }
                 } else if (item.getItemId() == R.id.profile) {
+                    // 个人资料：如果未添加则添加并加入返回栈
                     if (!profileFragment.isAdded()) {
-//                        transaction.setCustomAnimations(R.anim.enter_from_right, R.anim.exit_to_left, R.anim.enter_from_left, R.anim.exit_to_right);
                         transaction.replace(R.id.main_frame_layout, profileFragment, "profile");
                         transaction.addToBackStack(null);
                     }
                 }
-                transaction.commit();
+                transaction.commit(); // 提交事务
                 return true;
             }
         });
-        bottomNavigationView.setSelectedItemId(R.id.home);
-        addOrRemoveBadge();
+        bottomNavigationView.setSelectedItemId(R.id.home); // 默认选中首页
+        addOrRemoveBadge(); // 更新购物车徽章
 
+        // 监听Fragment返回栈变化，更新底部导航选中状态
         getSupportFragmentManager().addOnBackStackChangedListener(new FragmentManager.OnBackStackChangedListener() {
             @Override
             public void onBackStackChanged() {
-                updateBottomNavigationSelectedItem();
+                updateBottomNavigationSelectedItem(); // 更新底部导航选中项
             }
         });
 
+        // 设置搜索栏监听器
         searchBar.setOnSearchActionListener(new SimpleOnSearchActionListener() {
             @Override
             public void onSearchStateChanged(boolean enabled) {
@@ -120,6 +143,7 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onSearchConfirmed(CharSequence text) {
+                // 搜索确认时，如果搜索Fragment未添加则添加它
                 if (!searchFragment.isAdded())
                     getSupportFragmentManager().beginTransaction().replace(R.id.main_frame_layout, searchFragment, "search").addToBackStack(null).commit();
                 super.onSearchConfirmed(text);
@@ -131,33 +155,48 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        handleDeepLink();
+        handleDeepLink(); // 处理深度链接
 
+        // 如果从订单页面返回，直接跳转到个人资料页面
         if (getIntent().getBooleanExtra("orderPlaced", false)){
             getSupportFragmentManager().beginTransaction().replace(R.id.main_frame_layout, profileFragment, "profile").addToBackStack(null).commit();
             bottomNavigationView.setSelectedItemId(R.id.profile);
         }
     }
 
+    /**
+     * 显示搜索栏
+     */
     public void showSearchBar(){
         searchLinearLayout.setVisibility(View.VISIBLE);
     }
 
+    /**
+     * 隐藏搜索栏
+     */
     public void hideSearchBar(){
         searchLinearLayout.setVisibility(View.GONE);
     }
 
+    /**
+     * 处理返回按钮按下事件
+     * 如果有Fragment在返回栈中，则弹出；否则执行默认返回行为
+     */
     @Override
     public void onBackPressed() {
         if (fm.getBackStackEntryCount() > 0)
-            fm.popBackStack();
+            fm.popBackStack(); // 弹出返回栈中的Fragment
         else
-            super.onBackPressed();
+            super.onBackPressed(); // 执行默认返回行为
     }
 
+    /**
+     * 根据当前显示的Fragment更新底部导航栏的选中状态
+     */
     private void updateBottomNavigationSelectedItem() {
         Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.main_frame_layout);
 
+        // 根据当前Fragment类型设置对应的导航项为选中状态
         if (currentFragment instanceof HomeFragment)
             bottomNavigationView.setSelectedItemId(R.id.home);
         else if (currentFragment instanceof CartFragment)
@@ -168,28 +207,35 @@ public class MainActivity extends AppCompatActivity {
             bottomNavigationView.setSelectedItemId(R.id.profile);
     }
 
+    /**
+     * 添加或移除购物车徽章
+     * 根据购物车中的商品数量显示或隐藏徽章
+     */
     public void addOrRemoveBadge() {
-        // Check if user is authenticated before accessing cart items
+        // 检查用户是否已登录，未登录则隐藏徽章
         if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() == null) {
-            // User not logged in, hide badge
+            // 用户未登录，隐藏徽章
             BadgeDrawable badge = bottomNavigationView.getOrCreateBadge(R.id.cart);
             badge.setVisible(false);
             badge.clearNumber();
             return;
         }
         
+        // 获取购物车商品数量并更新徽章
         FirebaseUtil.getCartItems().get()
                 .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<QuerySnapshot> task) {
                         if (task.isSuccessful()){
-                            int n = task.getResult().size();
+                            int n = task.getResult().size(); // 获取购物车商品数量
                             BadgeDrawable badge = bottomNavigationView.getOrCreateBadge(R.id.cart);
-                            badge.setBackgroundColor(Color.parseColor("#FFF44336"));
+                            badge.setBackgroundColor(Color.parseColor("#FFF44336")); // 设置徽章背景色为红色
                             if (n > 0) {
+                                // 有商品时显示徽章并设置数量
                                 badge.setVisible(true);
                                 badge.setNumber(n);
                             } else {
+                                // 无商品时隐藏徽章
                                 badge.setVisible(false);
                                 badge.clearNumber();
                             }
@@ -198,6 +244,10 @@ public class MainActivity extends AppCompatActivity {
                 });
     }
 
+    /**
+     * 处理深度链接
+     * 如果应用通过深度链接打开，解析链接并跳转到对应产品页面
+     */
     private void handleDeepLink(){
         FirebaseDynamicLinks.getInstance().getDynamicLink(getIntent())
                 .addOnSuccessListener(new OnSuccessListener<PendingDynamicLinkData>() {
@@ -205,11 +255,13 @@ public class MainActivity extends AppCompatActivity {
                     public void onSuccess(PendingDynamicLinkData pendingDynamicLinkData) {
                         Uri deepLink = null;
                         if (pendingDynamicLinkData != null)
-                            deepLink = pendingDynamicLinkData.getLink();
+                            deepLink = pendingDynamicLinkData.getLink(); // 获取深度链接
 
                         if (deepLink != null){
                             Log.i("DeepLink", deepLink.toString());
+                            // 从链接中获取产品ID
                             String productId = deepLink.getQueryParameter("product_id");
+                            // 创建产品Fragment并显示
                             Fragment fragment = ProductFragment.newInstance(Integer.parseInt(productId));
                             getSupportFragmentManager().beginTransaction().replace(R.id.main_frame_layout, fragment).addToBackStack(null).commit();
                         }

@@ -30,15 +30,36 @@ import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.squareup.picasso.Picasso;
 
+/**
+ * 愿望单商品适配器
+ * 用于在RecyclerView中显示愿望单商品列表
+ * 继承自FirestoreRecyclerAdapter，自动同步Firestore数据
+ * 功能包括：
+ * - 显示愿望单商品
+ * - 从愿望单移除商品
+ * - 将愿望单商品添加到购物车
+ */
 public class WishlistProductAdapter extends FirestoreRecyclerAdapter<CartItemModel, WishlistProductAdapter.WishlistProductViewHolder> {
-    private Context context;
-    private AppCompatActivity activity;
+    private Context context;           // 上下文
+    private AppCompatActivity activity; // 活动实例
 
+    /**
+     * 构造函数
+     * @param options Firestore查询选项
+     * @param context 上下文
+     */
     public WishlistProductAdapter(@NonNull FirestoreRecyclerOptions<CartItemModel> options, Context context) {
         super(options);
         this.context = context;
     }
 
+    /**
+     * 绑定ViewHolder数据
+     * 将愿望单商品数据绑定到ViewHolder的UI组件上
+     * @param holder ViewHolder实例
+     * @param position 位置
+     * @param product 愿望单商品数据模型
+     */
     @Override
     protected void onBindViewHolder(@NonNull WishlistProductAdapter.WishlistProductViewHolder holder, int position, @NonNull CartItemModel product) {
         holder.productNameTextView.setText(product.getName());

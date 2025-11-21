@@ -27,19 +27,36 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.UserProfileChangeRequest;
 
+/**
+ * 注册活动页面
+ * 提供用户注册功能
+ * 功能包括：
+ * - 用户输入姓名、邮箱和密码
+ * - 创建Firebase账户
+ * - 发送邮箱验证
+ * - 设置用户显示名称
+ */
 public class SignupActivity extends AppCompatActivity {
 
-    ProgressBar progressBar;
-    EditText nameEditText, emailEditText, passEditText;
-    ImageView nextBtn;
-    TextView loginPageBtn;
+    // UI组件
+    ProgressBar progressBar;        // 进度条，显示注册加载状态
+    EditText nameEditText;          // 姓名输入框
+    EditText emailEditText;         // 邮箱输入框
+    EditText passEditText;          // 密码输入框
+    ImageView nextBtn;              // 下一步/注册按钮
+    TextView loginPageBtn;          // 跳转到登录页面的按钮
 
+    /**
+     * 活动创建时的初始化方法
+     * 初始化UI组件并设置点击事件
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
+        EdgeToEdge.enable(this); // 启用边缘到边缘显示
         setContentView(R.layout.activity_signup);
 
+        // 初始化UI组件
         progressBar = findViewById(R.id.progress_bar);
         nameEditText = findViewById(R.id.nameEditText);
         emailEditText = findViewById(R.id.emailEditText);
@@ -47,24 +64,34 @@ public class SignupActivity extends AppCompatActivity {
         nextBtn = findViewById(R.id.nextBtn);
         loginPageBtn = findViewById(R.id.loginPageBtn);
 
+        // 设置注册按钮点击事件
         nextBtn.setOnClickListener(v -> createAccount());
 
+        // 设置跳转到登录页面的按钮点击事件
         loginPageBtn.setOnClickListener(v -> {
             startActivity(new Intent(this, LoginActivity.class));
-            finish();
+            finish(); // 结束当前注册页面
         });
     }
 
+    /**
+     * 处理用户注册
+     * 获取用户输入，验证后调用Firebase注册
+     */
     private void createAccount() {
-        String email = emailEditText.getText().toString();
-        String pass = passEditText.getText().toString();
-        boolean isValidated = validate(email, pass);
+        String email = emailEditText.getText().toString(); // 获取邮箱
+        String pass = passEditText.getText().toString();   // 获取密码
+        boolean isValidated = validate(email, pass);       // 验证输入格式
         if (!isValidated)
-            return;
-
-        createAccountInFirebase(email,pass);
+            return; // 如果验证失败，直接返回
+        createAccountInFirebase(email,pass); // 调用Firebase注册
     }
 
+    /**
+     * 在Firebase中创建账户
+     * @param email 用户邮箱
+     * @param pass 用户密码
+     */
     void createAccountInFirebase(String email, String pass) {
         changeInProgress(true);
 
