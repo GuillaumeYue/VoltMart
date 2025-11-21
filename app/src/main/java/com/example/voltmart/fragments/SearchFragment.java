@@ -82,40 +82,7 @@ public class SearchFragment extends Fragment {
         searchBar = getActivity().findViewById(R.id.searchBar);
 
         if (searchBar != null) {
-            // 设置搜索栏监听器
-            searchBar.setOnSearchActionListener(new SimpleOnSearchActionListener() {
-                @Override
-                public void onSearchStateChanged(boolean enabled) {
-                    super.onSearchStateChanged(enabled);
-                    // 搜索栏关闭时返回首页
-                    if (!enabled && activity != null) {
-                        navigateBackToHome();
-                    }
-                }
-
-                @Override
-                public void onSearchConfirmed(CharSequence text) {
-                    super.onSearchConfirmed(text);
-                    // 获取搜索文本并执行搜索
-                    String searchText = "";
-                    if (text != null && text.length() > 0) {
-                        searchText = text.toString().trim();
-                    } else if (searchBar != null && searchBar.getText() != null) {
-                        searchText = searchBar.getText().toString().trim();
-                    }
-                    performSearch(searchText);
-                }
-
-                @Override
-                public void onButtonClicked(int buttonCode) {
-                    super.onButtonClicked(buttonCode);
-                    // 点击搜索栏按钮时返回首页
-                    if (activity != null) {
-                        navigateBackToHome();
-                    }
-                }
-            });
-            
+            // SearchFragment只处理搜索执行，不覆盖MainActivity的导航逻辑
             // 设置实时搜索（用户输入时自动搜索）
             setupRealTimeSearch();
         }
@@ -157,7 +124,7 @@ public class SearchFragment extends Fragment {
     /**
      * Perform search with flexible keyword matching
      */
-    private void performSearch(String searchTerm) {
+    public void performSearch(String searchTerm) {
         if (productRecyclerView == null || getActivity() == null) {
             return;
         }
@@ -349,7 +316,10 @@ public class SearchFragment extends Fragment {
             backPressedCallback = new androidx.activity.OnBackPressedCallback(true) {
                 @Override
                 public void handleOnBackPressed() {
-                    navigateBackToHome();
+                    MainActivity activity = (MainActivity) getActivity();
+                    if (activity != null) {
+                        activity.navigateBackToHome();
+                    }
                 }
             };
             getActivity().getOnBackPressedDispatcher().addCallback(this, backPressedCallback);
@@ -444,33 +414,6 @@ public class SearchFragment extends Fragment {
         return null;
     }
 
-    private void navigateBackToHome() {
-        MainActivity activity = (MainActivity) getActivity();
-        if (activity == null) {
-            return;
-        }
-
-        // Clear search bar
-        if (searchBar != null) {
-            searchBar.setText("");
-        }
-
-        // Hide search bar
-        activity.hideSearchBar();
-
-        // Navigate back - always pop back stack if available, otherwise go to home
-        if (activity.getSupportFragmentManager().getBackStackEntryCount() > 0) {
-            // Pop back stack to return to previous fragment
-            activity.getSupportFragmentManager().popBackStackImmediate();
-        } else {
-            // If no back stack, navigate to home fragment
-            HomeFragment homeFragment = new HomeFragment();
-            activity.getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.main_frame_layout, homeFragment, "home")
-                    .commitAllowingStateLoss();
-        }
-    }
 
     /**
      * Simple RecyclerView adapter for search results

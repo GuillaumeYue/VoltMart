@@ -3,6 +3,8 @@ package com.example.voltmart.activities;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
@@ -151,20 +153,31 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onSearchConfirmed(CharSequence text) {
                 // 搜索确认时，如果搜索Fragment未添加则添加它
-                if (!searchFragment.isAdded())
-                    getSupportFragmentManager().beginTransaction().replace(R.id.main_frame_layout, searchFragment, "search").addToBackStack(null).commit();
+                Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.main_frame_layout);
+                if (!(currentFragment instanceof SearchFragment)) {
+                    getSupportFragmentManager().beginTransaction()
+                            .replace(R.id.main_frame_layout, searchFragment, "search")
+                            .addToBackStack(null)
+                            .commit();
+                    // 等待Fragment创建后再执行搜索
+                    new Handler().postDelayed(() -> {
+                        executeSearchInFragment(text);
+                    }, 100);
+                } else {
+                    // 如果SearchFragment已存在，直接执行搜索
+                    executeSearchInFragment(text);
+                }
                 super.onSearchConfirmed(text);
             }
 
             @Override
             public void onButtonClicked(int buttonCode) {
-                // 点击搜索栏返回按钮时，返回首页
-                Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.main_frame_layout);
-                if (currentFragment instanceof SearchFragment) {
-                    navigateBackToHome();
-                } else {
-                    // 如果不在搜索页面，关闭搜索栏
-                    searchBar.closeSearch();
+                // Handle back button click - always navigate to home
+                if (buttonCode == MaterialSearchBar.BUTTON_BACK) {
+                    // Post to UI thread to ensure it runs after any other handlers
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        navigateBackToHome();
+                    });
                 }
             }
         });
@@ -198,10 +211,20 @@ public class MainActivity extends AppCompatActivity {
      */
     @Override
     public void onBackPressed() {
-        if (fm.getBackStackEntryCount() > 0)
+        Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.main_frame_layout);
+        
+        // If on search fragment, navigate to home instead of closing app
+        if (currentFragment instanceof SearchFragment) {
+            navigateBackToHome();
+            return;
+        }
+        
+        // Otherwise, handle normally
+        if (fm.getBackStackEntryCount() > 0) {
             fm.popBackStack(); // 弹出返回栈中的Fragment
-        else
+        } else {
             super.onBackPressed(); // 执行默认返回行为
+        }
     }
 
     /**
@@ -262,30 +285,35 @@ public class MainActivity extends AppCompatActivity {
      * 处理深度链接
      * 如果应用通过深度链接打开，解析链接并跳转到对应产品页面
      */
-    private void navigateBackToHome() {
-        // 清除搜索栏
-        if (searchBar != null) {
-            searchBar.setText("");
-            searchBar.closeSearch();
+    public void navigateBackToHome() {
+        // Use bottom navigation to navigate - this is the safest way
+        // It will handle everything properly and show the search bar
+        if (bottomNavigationView != null) {
+            bottomNavigationView.setSelectedItemId(R.id.home);
         }
         
-        // 隐藏搜索栏
-        hideSearchBar();
-        
-        // 如果有返回栈，弹出返回栈
-        if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
-            getSupportFragmentManager().popBackStackImmediate();
-        } else {
-            // 如果没有返回栈，直接导航到首页
-            HomeFragment homeFragment = new HomeFragment();
-            getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.main_frame_layout, homeFragment, "home")
-                    .commit();
+        // Clear search bar text and close search after a short delay
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (searchBar != null) {
+                searchBar.setText("");
+                searchBar.closeSearch();
+            }
+            // Ensure search bar is visible
+            showSearchBar();
+        }, 100);
+    }
+
+    private void executeSearchInFragment(CharSequence text) {
+        Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.main_frame_layout);
+        if (currentFragment instanceof SearchFragment) {
+            String searchText = text != null ? text.toString().trim() : "";
+            if (searchText.isEmpty() && searchBar != null && searchBar.getText() != null) {
+                searchText = searchBar.getText().toString().trim();
+            }
+            if (!searchText.isEmpty()) {
+                ((SearchFragment) currentFragment).performSearch(searchText);
+            }
         }
-        
-        // 更新底部导航选中状态为首页
-        bottomNavigationView.setSelectedItemId(R.id.home);
     }
 
     private void handleDeepLink(){
