@@ -115,38 +115,56 @@ public class CategoryFragment extends Fragment {
             return;
         }
         
-        // Prepare all variations to try
         String normalizedCategory = normalizeCategoryName(categoryName);
         String lowerCategory = categoryName.toLowerCase().trim();
         
-        // Build list of category variations to try (remove duplicates)
         java.util.List<String> categoriesToTry = new java.util.ArrayList<>();
-        categoriesToTry.add(categoryName); // Original
-        if (!categoriesToTry.contains(lowerCategory)) {
-            categoriesToTry.add(lowerCategory);
-        }
-        if (!categoriesToTry.contains(normalizedCategory)) {
-            categoriesToTry.add(normalizedCategory);
-        }
         
-        // Also try with space variations for multi-word categories
-        if (categoryName.contains(" ")) {
-            // Try with hyphen
-            String withHyphen = categoryName.toLowerCase().replace(" ", "-");
-            if (!categoriesToTry.contains(withHyphen)) {
-                categoriesToTry.add(withHyphen);
+        String lower = categoryName.toLowerCase().trim();
+        if (lower.contains("gaming") && lower.contains("mouse")) {
+            categoriesToTry.add(categoryName);
+            categoriesToTry.add("Gaming Mouse");
+            categoriesToTry.add("gaming mouse");
+            categoriesToTry.add("GamingMouse");
+            categoriesToTry.add("gamingmouse");
+            categoriesToTry.add("gaming-mouse");
+            categoriesToTry.add("gaming_mouse");
+            categoriesToTry.add("Gaming-Mouse");
+            categoriesToTry.add("Gaming_Mouse");
+            categoriesToTry.add("Mouse");
+            categoriesToTry.add("mouse");
+        } else {
+            if (normalizedCategory != null && !normalizedCategory.isEmpty()) {
+                categoriesToTry.add(normalizedCategory);
             }
-            // Try with underscore
-            String withUnderscore = categoryName.toLowerCase().replace(" ", "_");
-            if (!categoriesToTry.contains(withUnderscore)) {
-                categoriesToTry.add(withUnderscore);
+            
+            if (!categoriesToTry.contains(lowerCategory)) {
+                categoriesToTry.add(lowerCategory);
+            }
+            
+            if (!categoriesToTry.contains(categoryName)) {
+                categoriesToTry.add(categoryName);
+            }
+            
+            if (categoryName.contains(" ")) {
+                String withHyphen = categoryName.toLowerCase().replace(" ", "-");
+                if (!categoriesToTry.contains(withHyphen)) {
+                    categoriesToTry.add(withHyphen);
+                }
+                String withUnderscore = categoryName.toLowerCase().replace(" ", "_");
+                if (!categoriesToTry.contains(withUnderscore)) {
+                    categoriesToTry.add(withUnderscore);
+                }
+                String camelCase = toCamelCase(categoryName);
+                if (!categoriesToTry.contains(camelCase)) {
+                    categoriesToTry.add(camelCase);
+                }
             }
         }
         
         android.util.Log.d("CategoryFragment", "Searching products for category: " + categoryName);
         android.util.Log.d("CategoryFragment", "Will try variations: " + categoriesToTry);
         
-        // Try all variations sequentially
         tryCategoryVariations(categoriesToTry, 0);
     }
     
@@ -154,102 +172,120 @@ public class CategoryFragment extends Fragment {
      * Tries category variations sequentially until one works
      */
     private void tryCategoryVariations(java.util.List<String> categoriesToTry, int currentIndex) {
-        if (getActivity() == null || currentIndex >= categoriesToTry.size()) {
-            android.util.Log.w("CategoryFragment", "No products found after trying all " + categoriesToTry.size() + " variations");
-            return;
-        }
-        
-        String categoryToTry = categoriesToTry.get(currentIndex);
-        android.util.Log.d("CategoryFragment", "Trying category variation [" + (currentIndex + 1) + "/" + categoriesToTry.size() + "]: " + categoryToTry);
-        
-        // Stop previous adapter if exists and clean up handler
-        if (searchProductAdapter != null) {
-            searchProductAdapter.stopListening();
-        }
-        if (categoryCheckHandler != null) {
-            categoryCheckHandler.removeCallbacksAndMessages(null);
-        }
-        
-        // Create query for this category variation
-        Query query = FirebaseUtil.getProducts().whereEqualTo("category", categoryToTry);
-        FirestoreRecyclerOptions<ProductModel> options = new FirestoreRecyclerOptions.Builder<ProductModel>()
-                .setQuery(query, ProductModel.class)
-                .build();
-        
-        searchProductAdapter = new SearchAdapter(options, getActivity());
-        productRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
-        productRecyclerView.setAdapter(searchProductAdapter);
-        searchProductAdapter.startListening();
-        
-        // Register observer to check if products were found
-        final int index = currentIndex;
-        final boolean[] foundProducts = {false};
-        // Use instance handler for cleanup
-        if (categoryCheckHandler == null) {
-            categoryCheckHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-        }
-        final android.os.Handler handler = categoryCheckHandler;
-        
-        // Set a timeout to check if products were found after a delay
-        Runnable checkTimeout = new Runnable() {
-            @Override
-            public void run() {
-                if (getActivity() == null) {
-                    return;
-                }
-                if (!foundProducts[0] && searchProductAdapter != null) {
-                    int itemCount = searchProductAdapter.getItemCount();
-                    android.util.Log.d("CategoryFragment", "Timeout check: itemCount = " + itemCount + " for category: " + categoryToTry);
-                    if (itemCount == 0) {
-                        if (index < categoriesToTry.size() - 1) {
-                            // No products found, try next variation
-                            android.util.Log.w("CategoryFragment", "No products found for: " + categoryToTry + " after timeout, trying next variation...");
-                            tryCategoryVariations(categoriesToTry, index + 1);
-                        } else {
-                            android.util.Log.w("CategoryFragment", "No products found after trying all " + categoriesToTry.size() + " variations");
-                        }
-                    } else {
-                        foundProducts[0] = true;
-                        android.util.Log.d("CategoryFragment", "Successfully found " + itemCount + " products with category: " + categoryToTry);
-                    }
-                }
-            }
-        };
-        
-        // Check after 1 second to give the query time to complete (reduced for faster response)
-        handler.postDelayed(checkTimeout, 1000);
-        
-        searchProductAdapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
-            @Override
-            public void onItemRangeInserted(int positionStart, int itemCount) {
-                super.onItemRangeInserted(positionStart, itemCount);
-                if (itemCount > 0 && !foundProducts[0]) {
-                    foundProducts[0] = true;
-                    handler.removeCallbacks(checkTimeout); // Cancel timeout since we found products
-                    android.util.Log.d("CategoryFragment", "Products loaded: " + itemCount + " items with category: " + categoryToTry);
-                }
+        try {
+            if (getActivity() == null || currentIndex >= categoriesToTry.size()) {
+                android.util.Log.w("CategoryFragment", "No products found after trying all " + categoriesToTry.size() + " variations");
+                return;
             }
             
-            @Override
-            public void onChanged() {
-                super.onChanged();
-                int itemCount = searchProductAdapter.getItemCount();
-                android.util.Log.d("CategoryFragment", "Adapter changed, itemCount: " + itemCount + " for category: " + categoryToTry);
-                
-                if (itemCount > 0 && !foundProducts[0]) {
-                    foundProducts[0] = true;
-                    handler.removeCallbacks(checkTimeout); // Cancel timeout since we found products
-                    android.util.Log.d("CategoryFragment", "Successfully found " + itemCount + " products with category: " + categoryToTry);
+            String categoryToTry = categoriesToTry.get(currentIndex);
+            android.util.Log.d("CategoryFragment", "Trying category variation [" + (currentIndex + 1) + "/" + categoriesToTry.size() + "]: " + categoryToTry);
+            
+            if (searchProductAdapter != null) {
+                try {
+                    searchProductAdapter.stopListening();
+                } catch (Exception e) {
+                    android.util.Log.e("CategoryFragment", "Error stopping adapter", e);
                 }
-                // Let the timeout handle trying the next variation to avoid conflicts
             }
-        });
+            if (categoryCheckHandler != null) {
+                categoryCheckHandler.removeCallbacksAndMessages(null);
+            }
+            
+            Query query = FirebaseUtil.getProducts().whereEqualTo("category", categoryToTry);
+            FirestoreRecyclerOptions<ProductModel> options = new FirestoreRecyclerOptions.Builder<ProductModel>()
+                    .setQuery(query, ProductModel.class)
+                    .build();
+            
+            searchProductAdapter = new SearchAdapter(options, getActivity());
+            if (productRecyclerView.getLayoutManager() == null) {
+                productRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
+            }
+            productRecyclerView.setAdapter(searchProductAdapter);
+            searchProductAdapter.startListening();
+            
+            final int index = currentIndex;
+            final boolean[] foundProducts = {false};
+            if (categoryCheckHandler == null) {
+                categoryCheckHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+            }
+            final android.os.Handler handler = categoryCheckHandler;
+            
+            Runnable checkTimeout = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        if (getActivity() == null) {
+                            return;
+                        }
+                        if (!foundProducts[0] && searchProductAdapter != null) {
+                            int itemCount = searchProductAdapter.getItemCount();
+                            android.util.Log.d("CategoryFragment", "Timeout check: itemCount = " + itemCount + " for category: " + categoryToTry);
+                            if (itemCount == 0) {
+                                if (index < categoriesToTry.size() - 1) {
+                                    android.util.Log.w("CategoryFragment", "No products found for: " + categoryToTry + " after timeout, trying next variation...");
+                                    tryCategoryVariations(categoriesToTry, index + 1);
+                                } else {
+                                    android.util.Log.w("CategoryFragment", "No products found after trying all " + categoriesToTry.size() + " variations");
+                                }
+                            } else {
+                                foundProducts[0] = true;
+                                android.util.Log.d("CategoryFragment", "Successfully found " + itemCount + " products with category: " + categoryToTry);
+                            }
+                        }
+                    } catch (Exception e) {
+                        android.util.Log.e("CategoryFragment", "Error in timeout check", e);
+                    }
+                }
+            };
+            
+            handler.postDelayed(checkTimeout, 500);
+            
+            searchProductAdapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
+                @Override
+                public void onItemRangeInserted(int positionStart, int itemCount) {
+                    try {
+                        super.onItemRangeInserted(positionStart, itemCount);
+                        if (itemCount > 0 && !foundProducts[0]) {
+                            foundProducts[0] = true;
+                            handler.removeCallbacks(checkTimeout);
+                            android.util.Log.d("CategoryFragment", "Products loaded: " + itemCount + " items with category: " + categoryToTry);
+                        }
+                    } catch (Exception e) {
+                        android.util.Log.e("CategoryFragment", "Error in onItemRangeInserted", e);
+                    }
+                }
+                
+                @Override
+                public void onChanged() {
+                    try {
+                        super.onChanged();
+                        int itemCount = searchProductAdapter.getItemCount();
+                        android.util.Log.d("CategoryFragment", "Adapter changed, itemCount: " + itemCount + " for category: " + categoryToTry);
+                        
+                        if (itemCount > 0 && !foundProducts[0]) {
+                            foundProducts[0] = true;
+                            handler.removeCallbacks(checkTimeout);
+                            android.util.Log.d("CategoryFragment", "Successfully found " + itemCount + " products with category: " + categoryToTry);
+                        }
+                    } catch (Exception e) {
+                        android.util.Log.e("CategoryFragment", "Error in onChanged", e);
+                    }
+                }
+            });
+        } catch (Exception e) {
+            android.util.Log.e("CategoryFragment", "Error in tryCategoryVariations", e);
+            if (currentIndex < categoriesToTry.size() - 1) {
+                tryCategoryVariations(categoriesToTry, currentIndex + 1);
+            }
+        }
     }
     
     /**
      * Normalizes category name to match product category values in Firebase
      * Examples:
      * "Smart Phone" -> "phones"
+     * "Gaming Mouse" -> "gaming mouse" or "gamingmouse"
      * "Laptop" -> "laptop"
      * "Gaming PC" -> "gamingpc" or "gaming pc"
      * "TV" -> "tv"
@@ -272,6 +308,13 @@ public class CategoryFragment extends Fragment {
             return "phones";
         }
         
+        if (lower.contains("gaming") && lower.contains("mouse")) {
+            return lower;
+        }
+        if (lower.equals("gamingmouse") || lower.equals("gaming-mouse") || lower.equals("gaming_mouse")) {
+            return lower;
+        }
+        
         // "Laptop" -> "laptop"
         if (lower.equals("laptop") || lower.equals("laptops")) {
             return "laptop";
@@ -279,7 +322,6 @@ public class CategoryFragment extends Fragment {
         
         // "Gaming PC" -> try "gamingpc" and "gaming pc"
         if (lower.contains("gaming") && lower.contains("pc")) {
-            // Try both variations
             return "gamingpc"; // Most likely format
         }
         if (lower.equals("gamingpc") || lower.equals("gaming pc")) {
@@ -296,12 +338,29 @@ public class CategoryFragment extends Fragment {
             return "tv";
         }
         
-        // For other categories, try both with and without spaces
-        // First try: lowercase with spaces removed
-        String noSpaces = lower.replaceAll("\\s+", "");
-        // This will be tried first in the query
-        
-        // Return normalized version (lowercase, no spaces) as default
-        return noSpaces;
+        return lower;
+    }
+    
+    /**
+     * Converts a string to camelCase
+     * Example: "Gaming Mouse" -> "GamingMouse"
+     */
+    private String toCamelCase(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        String[] words = text.split("\\s+");
+        StringBuilder camelCase = new StringBuilder();
+        for (int i = 0; i < words.length; i++) {
+            String word = words[i];
+            if (word.length() > 0) {
+                if (i == 0) {
+                    camelCase.append(word.substring(0, 1).toUpperCase()).append(word.substring(1).toLowerCase());
+                } else {
+                    camelCase.append(word.substring(0, 1).toUpperCase()).append(word.substring(1).toLowerCase());
+                }
+            }
+        }
+        return camelCase.toString();
     }
 }
