@@ -136,7 +136,7 @@ public class LoginActivity extends AppCompatActivity {
                     // 检查邮箱是否已验证
                     if (firebaseAuth.getCurrentUser().isEmailVerified()){
                         // 根据用户邮箱判断是管理员还是普通用户
-                        if (firebaseAuth.getCurrentUser().getEmail().equals("alexyuehan@gmail.com"))
+                        if (firebaseAuth.getCurrentUser().getEmail().equals("alexyuehan@gmail.com") || firebaseAuth.getCurrentUser().getEmail().equals("hi4659287@gmail.com"))
                             // 管理员跳转到管理员页面，使用转场动画
                             startActivity(new Intent(LoginActivity.this, AdminActivity.class), ActivityOptions.makeSceneTransitionAnimation(LoginActivity.this).toBundle());
                         else
