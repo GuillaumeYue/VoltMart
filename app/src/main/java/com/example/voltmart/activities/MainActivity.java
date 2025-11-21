@@ -139,6 +139,13 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onSearchStateChanged(boolean enabled) {
                 super.onSearchStateChanged(enabled);
+                // 当搜索栏关闭时，如果当前在搜索页面，返回首页
+                if (!enabled) {
+                    Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.main_frame_layout);
+                    if (currentFragment instanceof SearchFragment) {
+                        navigateBackToHome();
+                    }
+                }
             }
 
             @Override
@@ -151,7 +158,14 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onButtonClicked(int buttonCode) {
-                super.onButtonClicked(buttonCode);
+                // 点击搜索栏返回按钮时，返回首页
+                Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.main_frame_layout);
+                if (currentFragment instanceof SearchFragment) {
+                    navigateBackToHome();
+                } else {
+                    // 如果不在搜索页面，关闭搜索栏
+                    searchBar.closeSearch();
+                }
             }
         });
 
@@ -248,6 +262,32 @@ public class MainActivity extends AppCompatActivity {
      * 处理深度链接
      * 如果应用通过深度链接打开，解析链接并跳转到对应产品页面
      */
+    private void navigateBackToHome() {
+        // 清除搜索栏
+        if (searchBar != null) {
+            searchBar.setText("");
+            searchBar.closeSearch();
+        }
+        
+        // 隐藏搜索栏
+        hideSearchBar();
+        
+        // 如果有返回栈，弹出返回栈
+        if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+            getSupportFragmentManager().popBackStackImmediate();
+        } else {
+            // 如果没有返回栈，直接导航到首页
+            HomeFragment homeFragment = new HomeFragment();
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.main_frame_layout, homeFragment, "home")
+                    .commit();
+        }
+        
+        // 更新底部导航选中状态为首页
+        bottomNavigationView.setSelectedItemId(R.id.home);
+    }
+
     private void handleDeepLink(){
         FirebaseDynamicLinks.getInstance().getDynamicLink(getIntent())
                 .addOnSuccessListener(new OnSuccessListener<PendingDynamicLinkData>() {
