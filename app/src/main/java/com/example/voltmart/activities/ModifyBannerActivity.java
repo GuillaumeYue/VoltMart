@@ -60,6 +60,7 @@ public class ModifyBannerActivity extends AppCompatActivity {
     TextInputEditText descEditText;      // 描述输入框
     Button imageBtn;                     // 选择图片按钮
     Button modifyBannerBtn;              // 修改横幅按钮
+    Button deleteBannerBtn;              // 删除横幅按钮
     ImageView backBtn;                   // 返回按钮
     ImageView bannerImageView;           // 横幅图片预览
     TextView removeImageBtn;              // 移除图片按钮
@@ -96,6 +97,7 @@ public class ModifyBannerActivity extends AppCompatActivity {
         bannerImageView = findViewById(R.id.bannerImageView);
         imageBtn = findViewById(R.id.imageBtn);
         modifyBannerBtn = findViewById(R.id.modifyBannerBtn);
+        deleteBannerBtn = findViewById(R.id.deleteBannerBtn);
         backBtn = findViewById(R.id.backBtn);
         removeImageBtn = findViewById(R.id.removeImageBtn);
 
@@ -108,6 +110,10 @@ public class ModifyBannerActivity extends AppCompatActivity {
 
         modifyBannerBtn.setOnClickListener(v -> {
             updateToFirebase();
+        });
+
+        deleteBannerBtn.setOnClickListener(v -> {
+            deleteBanner();
         });
 
         backBtn.setOnClickListener(v -> {
@@ -294,6 +300,44 @@ public class ModifyBannerActivity extends AppCompatActivity {
             isValid = false;
         }
         return isValid;
+    }
+
+    private void deleteBanner() {
+        if (docId == null || docId.isEmpty()) {
+            Toast.makeText(context, "Please select a banner first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        SweetAlertDialog alertDialog = new SweetAlertDialog(this, SweetAlertDialog.WARNING_TYPE);
+        alertDialog
+                .setTitleText("Are you sure?")
+                .setContentText("Do you want to delete this banner? This action cannot be undone.")
+                .setConfirmText("Yes, Delete")
+                .setCancelText("Cancel")
+                .setConfirmClickListener(sweetAlertDialog -> {
+                    SweetAlertDialog progressDialog = new SweetAlertDialog(context, SweetAlertDialog.PROGRESS_TYPE);
+                    progressDialog.getProgressHelper().setBarColor(Color.parseColor("#A5DC86"));
+                    progressDialog.setTitleText("Deleting...");
+                    progressDialog.setCancelable(false);
+                    progressDialog.show();
+
+                    FirebaseUtil.getBannerImageReference(bannerId + "").delete()
+                            .addOnCompleteListener(task -> {
+                                FirebaseUtil.getBanner().document(docId).delete()
+                                        .addOnCompleteListener(task1 -> {
+                                            progressDialog.dismiss();
+                                            if (task1.isSuccessful()) {
+                                                new SweetAlertDialog(context, SweetAlertDialog.SUCCESS_TYPE)
+                                                        .setTitleText("Deleted!")
+                                                        .setContentText("Banner has been deleted successfully")
+                                                        .setConfirmClickListener(sweetAlertDialog1 -> finish()).show();
+                                            } else {
+                                                Toast.makeText(context, "Failed to delete banner", Toast.LENGTH_SHORT).show();
+                                            }
+                                        });
+                            });
+                    sweetAlertDialog.cancel();
+                }).show();
     }
 
     private void removeImage() {

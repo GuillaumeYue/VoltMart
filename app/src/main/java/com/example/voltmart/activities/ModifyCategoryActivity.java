@@ -44,7 +44,7 @@ public class ModifyCategoryActivity extends AppCompatActivity {
 
     LinearLayout detailsLinearLayout;
     TextInputEditText nameEditText, descEditText, colorEditText;
-    Button imageBtn, modifyCategoryBtn;
+    Button imageBtn, modifyCategoryBtn, deleteCategoryBtn;
     ImageView backBtn, categoryImageView;
     TextView removeImageBtn;
 
@@ -74,6 +74,7 @@ public class ModifyCategoryActivity extends AppCompatActivity {
         categoryImageView = findViewById(R.id.categoryImageView);
         imageBtn = findViewById(R.id.imageBtn);
         modifyCategoryBtn = findViewById(R.id.modifyCategoryBtn);
+        deleteCategoryBtn = findViewById(R.id.deleteCategoryBtn);
         backBtn = findViewById(R.id.backBtn);
         removeImageBtn = findViewById(R.id.removeImageBtn);
 
@@ -86,6 +87,10 @@ public class ModifyCategoryActivity extends AppCompatActivity {
 
         modifyCategoryBtn.setOnClickListener(v -> {
             updateToFirebase();
+        });
+
+        deleteCategoryBtn.setOnClickListener(v -> {
+            deleteCategory();
         });
 
         backBtn.setOnClickListener(v -> {
@@ -210,6 +215,44 @@ public class ModifyCategoryActivity extends AppCompatActivity {
             FirebaseUtil.getCategories().document(docId).update("brief", descEditText.getText().toString());
         if (!colorEditText.getText().toString().equals(currCategory.getColor()))
             FirebaseUtil.getCategories().document(docId).update("color", colorEditText.getText().toString());
+    }
+
+    private void deleteCategory() {
+        if (docId == null || docId.isEmpty()) {
+            Toast.makeText(context, "Please select a category first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        SweetAlertDialog alertDialog = new SweetAlertDialog(this, SweetAlertDialog.WARNING_TYPE);
+        alertDialog
+                .setTitleText("Are you sure?")
+                .setContentText("Do you want to delete this category? This action cannot be undone.")
+                .setConfirmText("Yes, Delete")
+                .setCancelText("Cancel")
+                .setConfirmClickListener(sweetAlertDialog -> {
+                    SweetAlertDialog progressDialog = new SweetAlertDialog(context, SweetAlertDialog.PROGRESS_TYPE);
+                    progressDialog.getProgressHelper().setBarColor(Color.parseColor("#A5DC86"));
+                    progressDialog.setTitleText("Deleting...");
+                    progressDialog.setCancelable(false);
+                    progressDialog.show();
+
+                    FirebaseUtil.getCategoryImageReference(categoryId + "").delete()
+                            .addOnCompleteListener(task -> {
+                                FirebaseUtil.getCategories().document(docId).delete()
+                                        .addOnCompleteListener(task1 -> {
+                                            progressDialog.dismiss();
+                                            if (task1.isSuccessful()) {
+                                                new SweetAlertDialog(context, SweetAlertDialog.SUCCESS_TYPE)
+                                                        .setTitleText("Deleted!")
+                                                        .setContentText("Category has been deleted successfully")
+                                                        .setConfirmClickListener(sweetAlertDialog1 -> finish()).show();
+                                            } else {
+                                                Toast.makeText(context, "Failed to delete category", Toast.LENGTH_SHORT).show();
+                                            }
+                                        });
+                            });
+                    sweetAlertDialog.cancel();
+                }).show();
     }
 
     private void removeImage() {

@@ -155,12 +155,26 @@
                             android:textSize="18sp" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <Button
-                        android:id="@+id/modifyBannerBtn"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:text="Modify Banner" />
+                        android:orientation="horizontal">
+                        
+                        <Button
+                            android:id="@+id/modifyBannerBtn"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Modify Banner" />
+                            
+                        <Button
+                            android:id="@+id/deleteBannerBtn"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:backgroundTint="#FF0000"
+                            android:text="Delete Banner" />
+                    </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>

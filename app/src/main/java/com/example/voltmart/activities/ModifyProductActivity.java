@@ -46,7 +46,7 @@ public class ModifyProductActivity extends AppCompatActivity {
 
     LinearLayout detailsLinearLayout;
     TextInputEditText nameEditText, descEditText, specEditText, stockEditText, priceEditText, discountEditText;
-    Button imageBtn, modifyProductBtn;
+    Button imageBtn, modifyProductBtn, deleteProductBtn;
     ImageView backBtn, productImageView;
     TextView removeImageBtn;
 
@@ -81,6 +81,7 @@ public class ModifyProductActivity extends AppCompatActivity {
 
         imageBtn = findViewById(R.id.imageBtn);
         modifyProductBtn = findViewById(R.id.modifyProductBtn);
+        deleteProductBtn = findViewById(R.id.deleteProductBtn);
         backBtn = findViewById(R.id.backBtn);
         removeImageBtn = findViewById(R.id.removeImageBtn);
 
@@ -93,6 +94,10 @@ public class ModifyProductActivity extends AppCompatActivity {
 
         modifyProductBtn.setOnClickListener(v -> {
             updateToFirebase();
+        });
+
+        deleteProductBtn.setOnClickListener(v -> {
+            deleteProduct();
         });
 
         backBtn.setOnClickListener(v -> {
@@ -287,6 +292,44 @@ public class ModifyProductActivity extends AppCompatActivity {
         stockEditText.setText(currProduct.getStock() + "");
         priceEditText.setText(currProduct.getPrice() + "");
         discountEditText.setText(currProduct.getDiscount() + "");
+    }
+
+    private void deleteProduct() {
+        if (docId == null || docId.isEmpty()) {
+            Toast.makeText(context, "Please select a product first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        SweetAlertDialog alertDialog = new SweetAlertDialog(this, SweetAlertDialog.WARNING_TYPE);
+        alertDialog
+                .setTitleText("Are you sure?")
+                .setContentText("Do you want to delete this product? This action cannot be undone.")
+                .setConfirmText("Yes, Delete")
+                .setCancelText("Cancel")
+                .setConfirmClickListener(sweetAlertDialog -> {
+                    SweetAlertDialog progressDialog = new SweetAlertDialog(context, SweetAlertDialog.PROGRESS_TYPE);
+                    progressDialog.getProgressHelper().setBarColor(Color.parseColor("#A5DC86"));
+                    progressDialog.setTitleText("Deleting...");
+                    progressDialog.setCancelable(false);
+                    progressDialog.show();
+
+                    FirebaseUtil.getProductImageReference(productId + "").delete()
+                            .addOnCompleteListener(task -> {
+                                FirebaseUtil.getProducts().document(docId).delete()
+                                        .addOnCompleteListener(task1 -> {
+                                            progressDialog.dismiss();
+                                            if (task1.isSuccessful()) {
+                                                new SweetAlertDialog(context, SweetAlertDialog.SUCCESS_TYPE)
+                                                        .setTitleText("Deleted!")
+                                                        .setContentText("Product has been deleted successfully")
+                                                        .setConfirmClickListener(sweetAlertDialog1 -> finish()).show();
+                                            } else {
+                                                Toast.makeText(context, "Failed to delete product", Toast.LENGTH_SHORT).show();
+                                            }
+                                        });
+                            });
+                    sweetAlertDialog.cancel();
+                }).show();
     }
 
     private void removeImage() {
