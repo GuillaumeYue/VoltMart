@@ -21,7 +21,12 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import android.app.AlertDialog;
+import android.widget.LinearLayout;
+
 import com.example.voltmart.R;
+import com.example.voltmart.model.UserModel;
+import com.example.voltmart.utils.FirebaseUtil;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
@@ -32,7 +37,9 @@ import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
+import com.google.firebase.firestore.DocumentSnapshot;
 
 /**
  * 登录活动页面
@@ -46,6 +53,7 @@ public class LoginActivity extends AppCompatActivity {
     EditText emailEditText, passEditText; // 邮箱和密码输入框
     ImageView loginBtn;                   // 登录按钮
     TextView signupPageBtn;               // 跳转到注册页面的按钮
+    TextView forgotPasswordBtn;           // 忘记密码按钮
     Button googleLoginBtn;                 // Google登录按钮
 
     // Firebase和Google登录相关
@@ -68,6 +76,7 @@ public class LoginActivity extends AppCompatActivity {
         passEditText = findViewById(R.id.passEditText);
         loginBtn = findViewById(R.id.loginBtn);
         signupPageBtn = findViewById(R.id.signupPageBtn);
+        forgotPasswordBtn = findViewById(R.id.forgotPasswordBtn);
         googleLoginBtn = findViewById(R.id.googleLoginBtn);
 
         // 设置登录按钮点击事件
@@ -83,6 +92,14 @@ public class LoginActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 startActivity(new Intent(LoginActivity.this, SignupActivity.class));
+            }
+        });
+        
+        // 设置忘记密码按钮点击事件
+        forgotPasswordBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showForgotPasswordDialog();
             }
         });
         
@@ -133,19 +150,26 @@ public class LoginActivity extends AppCompatActivity {
             public void onComplete(@NonNull Task<AuthResult> task) {
                 changeInProgress(false); // 隐藏加载进度条
                 if (task.isSuccessful()){
-                    // 检查邮箱是否已验证
-                    if (firebaseAuth.getCurrentUser().isEmailVerified()){
-                        // 根据用户邮箱判断是管理员还是普通用户
-                        if (firebaseAuth.getCurrentUser().getEmail().equals("alexyuehan@gmail.com") || firebaseAuth.getCurrentUser().getEmail().equals("hi4659287@gmail.com"))
-                            // 管理员跳转到管理员页面，使用转场动画
-                            startActivity(new Intent(LoginActivity.this, AdminActivity.class), ActivityOptions.makeSceneTransitionAnimation(LoginActivity.this).toBundle());
-                        else
-                            // 普通用户跳转到主页面
-                            startActivity(new Intent(LoginActivity.this, MainActivity.class));
-                        finish(); // 结束当前登录页面
-                    } else {
-                        // 邮箱未验证，提示用户
-                        Toast.makeText(LoginActivity.this, "Email not verified, please verify your email", Toast.LENGTH_SHORT).show();
+                    FirebaseUser firebaseUser = firebaseAuth.getCurrentUser();
+                    if (firebaseUser != null) {
+                        // 检查邮箱是否已验证
+                        if (firebaseUser.isEmailVerified()){
+                            // 确保用户信息存在于Firestore中
+                            ensureUserInFirestore(firebaseUser);
+                            
+                            // 根据用户邮箱判断是管理员还是普通用户
+                            String userEmail = firebaseUser.getEmail();
+                            if (userEmail != null && (userEmail.equals("alexyuehan@gmail.com") || userEmail.equals("hi4659287@gmail.com")))
+                                // 管理员跳转到管理员页面，使用转场动画
+                                startActivity(new Intent(LoginActivity.this, AdminActivity.class), ActivityOptions.makeSceneTransitionAnimation(LoginActivity.this).toBundle());
+                            else
+                                // 普通用户跳转到主页面
+                                startActivity(new Intent(LoginActivity.this, MainActivity.class));
+                            finish(); // 结束当前登录页面
+                        } else {
+                            // 邮箱未验证，提示用户
+                            Toast.makeText(LoginActivity.this, "Email not verified, please verify your email", Toast.LENGTH_SHORT).show();
+                        }
                     }
                 }
                 else {
@@ -237,14 +261,20 @@ public class LoginActivity extends AppCompatActivity {
                     @Override
                     public void onComplete(@NonNull Task<AuthResult> task) {
                         if (task.isSuccessful()) {
-                            // 登录成功，获取用户邮箱
-                            String email = firebaseAuth.getCurrentUser().getEmail();
-                            // 根据邮箱判断用户类型并跳转
-                            if (email.equals("alexyuehan@gmail.com"))  // 管理员邮箱
-                                startActivity(new Intent(LoginActivity.this, AdminActivity.class)); // 跳转到管理员页面
-                            else
-                                startActivity(new Intent(LoginActivity.this, MainActivity.class)); // 跳转到主页面
-                            finish(); // 结束登录页面
+                            FirebaseUser firebaseUser = firebaseAuth.getCurrentUser();
+                            if (firebaseUser != null) {
+                                // 确保用户信息存在于Firestore中
+                                ensureUserInFirestore(firebaseUser);
+                                
+                                // 登录成功，获取用户邮箱
+                                String email = firebaseUser.getEmail();
+                                // 根据邮箱判断用户类型并跳转
+                                if (email != null && email.equals("alexyuehan@gmail.com"))  // 管理员邮箱
+                                    startActivity(new Intent(LoginActivity.this, AdminActivity.class)); // 跳转到管理员页面
+                                else
+                                    startActivity(new Intent(LoginActivity.this, MainActivity.class)); // 跳转到主页面
+                                finish(); // 结束登录页面
+                            }
                         }
                         else
                             // 认证失败，显示错误提示
@@ -252,5 +282,139 @@ public class LoginActivity extends AppCompatActivity {
                     }
                 });
 
+    }
+
+    /**
+     * 确保用户信息存在于Firestore中
+     * 如果用户不存在，则创建用户文档
+     * @param firebaseUser Firebase用户对象
+     */
+    private void ensureUserInFirestore(FirebaseUser firebaseUser) {
+        if (firebaseUser == null) return;
+        
+        String uid = firebaseUser.getUid();
+        
+        // 检查用户是否已存在于Firestore中
+        FirebaseUtil.getUsers().document(uid).get()
+                .addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+                    @Override
+                    public void onComplete(@NonNull Task<DocumentSnapshot> task) {
+                        if (task.isSuccessful()) {
+                            DocumentSnapshot document = task.getResult();
+                            // 如果用户不存在，创建用户文档
+                            if (document == null || !document.exists()) {
+                                String email = firebaseUser.getEmail();
+                                String displayName = firebaseUser.getDisplayName();
+                                String phoneNumber = firebaseUser.getPhoneNumber();
+                                
+                                UserModel userModel = new UserModel(
+                                        uid,
+                                        email != null ? email : "",
+                                        displayName != null ? displayName : "",
+                                        phoneNumber != null ? phoneNumber : ""
+                                );
+                                
+                                FirebaseUtil.getUsers().document(uid).set(userModel)
+                                        .addOnCompleteListener(new OnCompleteListener<Void>() {
+                                            @Override
+                                            public void onComplete(@NonNull Task<Void> task) {
+                                                if (task.isSuccessful()) {
+                                                    android.util.Log.d("LoginActivity", "User created in Firestore successfully");
+                                                } else {
+                                                    android.util.Log.e("LoginActivity", "Failed to create user in Firestore", task.getException());
+                                                }
+                                            }
+                                        });
+                            }
+                        } else {
+                            android.util.Log.e("LoginActivity", "Error checking user in Firestore", task.getException());
+                        }
+                    }
+                });
+    }
+
+    /**
+     * 显示忘记密码对话框
+     * 让用户输入邮箱地址，然后发送密码重置邮件
+     */
+    private void showForgotPasswordDialog() {
+        // 创建对话框布局
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+
+        // 创建邮箱输入框
+        final EditText emailInput = new EditText(this);
+        emailInput.setHint("Enter your email");
+        emailInput.setInputType(android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        emailInput.setMinWidth(400);
+        
+        // 如果邮箱输入框已有内容，自动填充
+        String currentEmail = emailEditText.getText().toString();
+        if (!currentEmail.isEmpty()) {
+            emailInput.setText(currentEmail);
+        }
+        
+        layout.addView(emailInput);
+
+        // 创建对话框
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Reset Password");
+        builder.setMessage("Enter your email address and we'll send you a link to reset your password.");
+        builder.setView(layout);
+        
+        // 设置确认按钮
+        builder.setPositiveButton("Send", (dialog, which) -> {
+            String email = emailInput.getText().toString().trim();
+            if (email.isEmpty()) {
+                Toast.makeText(LoginActivity.this, "Please enter your email address", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                Toast.makeText(LoginActivity.this, "Please enter a valid email address", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            sendPasswordResetEmail(email);
+        });
+        
+        // 设置取消按钮
+        builder.setNegativeButton("Cancel", (dialog, which) -> {
+            dialog.dismiss();
+        });
+        
+        builder.show();
+    }
+
+    /**
+     * 发送密码重置邮件
+     * @param email 用户邮箱地址
+     */
+    private void sendPasswordResetEmail(String email) {
+        FirebaseAuth.getInstance().sendPasswordResetEmail(email)
+                .addOnCompleteListener(new OnCompleteListener<Void>() {
+                    @Override
+                    public void onComplete(@NonNull Task<Void> task) {
+                        if (task.isSuccessful()) {
+                            Toast.makeText(LoginActivity.this, 
+                                    "Password reset email sent! Please check your inbox.", 
+                                    Toast.LENGTH_LONG).show();
+                        } else {
+                            String errorMessage = "Failed to send reset email";
+                            if (task.getException() != null) {
+                                String exceptionMessage = task.getException().getMessage();
+                                if (exceptionMessage != null) {
+                                    if (exceptionMessage.contains("user-not-found")) {
+                                        errorMessage = "No account found with this email address";
+                                    } else if (exceptionMessage.contains("invalid-email")) {
+                                        errorMessage = "Invalid email address";
+                                    } else {
+                                        errorMessage = exceptionMessage;
+                                    }
+                                }
+                            }
+                            Toast.makeText(LoginActivity.this, errorMessage, Toast.LENGTH_LONG).show();
+                        }
+                    }
+                });
     }
 }

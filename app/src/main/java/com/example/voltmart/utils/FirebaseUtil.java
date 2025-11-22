@@ -137,4 +137,12 @@ public class FirebaseUtil {
     public static StorageReference getBannerImageReference(String id){
         return FirebaseStorage.getInstance().getReference().child("banner_images").child(id);
     }
+
+    /**
+     * 获取用户集合引用
+     * @return 用户集合的引用
+     */
+    public static CollectionReference getUsers(){
+        return FirebaseFirestore.getInstance().collection("users");
+    }
 }

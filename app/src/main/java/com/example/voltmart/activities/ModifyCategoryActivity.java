@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -48,10 +50,10 @@ public class ModifyCategoryActivity extends AppCompatActivity {
     ImageView backBtn, categoryImageView;
     TextView removeImageBtn;
 
-    AutoCompleteTextView idDropDown;
-    ArrayAdapter<String> idAdapter;
+    AutoCompleteTextView idDropDown, statusDropDown;
+    ArrayAdapter<String> idAdapter, statusAdapter;
     CategoryModel currCategory;
-    String docId, categoryImage;
+    String docId, categoryImage, status;
     Uri imageUri;
     int categoryId;
     Context context = this;
@@ -70,6 +72,7 @@ public class ModifyCategoryActivity extends AppCompatActivity {
         nameEditText = findViewById(R.id.nameEditText);
         descEditText = findViewById(R.id.descriptionEditText);
         colorEditText = findViewById(R.id.colorEditText);
+        statusDropDown = findViewById(R.id.statusDropDown);
 
         categoryImageView = findViewById(R.id.categoryImageView);
         imageBtn = findViewById(R.id.imageBtn);
@@ -161,6 +164,33 @@ public class ModifyCategoryActivity extends AppCompatActivity {
             }
         });
 
+        statusAdapter = new ArrayAdapter<>(context, R.layout.dropdown_item, new String[]{"Enabled", "Disabled"});
+        statusDropDown.setAdapter(statusAdapter);
+        statusDropDown.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                status = adapterView.getItemAtPosition(i).toString();
+            }
+        });
+        
+        // Add text change listener to capture status changes
+        statusDropDown.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (s != null && s.length() > 0) {
+                    status = s.toString();
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
+
         detailsLinearLayout.setVisibility(View.VISIBLE);
         categoryImageView.setVisibility(View.VISIBLE);
         removeImageBtn.setVisibility(View.VISIBLE);
@@ -168,6 +198,17 @@ public class ModifyCategoryActivity extends AppCompatActivity {
         nameEditText.setText(currCategory.getName());
         descEditText.setText(currCategory.getBrief());
         colorEditText.setText(currCategory.getColor());
+        
+        // Set the status dropdown text and initialize the status variable
+        String currentStatus = currCategory.getStatus();
+        if (currentStatus != null && !currentStatus.isEmpty()) {
+            statusDropDown.setText(currentStatus, false); // false = don't filter
+            status = currentStatus; // Initialize status variable with current value
+        } else {
+            // Default to "Enabled" if status is null or empty
+            status = "Enabled";
+            statusDropDown.setText(status, false);
+        }
     }
 
     private void updateToFirebase(){
@@ -210,6 +251,18 @@ public class ModifyCategoryActivity extends AppCompatActivity {
             FirebaseUtil.getCategories().document(docId).update("brief", descEditText.getText().toString());
         if (!colorEditText.getText().toString().equals(currCategory.getColor()))
             FirebaseUtil.getCategories().document(docId).update("color", colorEditText.getText().toString());
+        
+        // Get the current status from dropdown text, or use the status variable if set
+        String newStatus = statusDropDown.getText().toString().trim();
+        if (newStatus.isEmpty() && status != null) {
+            newStatus = status; // Fallback to status variable if dropdown text is empty
+        }
+        
+        // Only update if status has changed
+        String currentStatus = currCategory.getStatus() != null ? currCategory.getStatus() : "Enabled";
+        if (!newStatus.isEmpty() && !newStatus.equals(currentStatus)) {
+            FirebaseUtil.getCategories().document(docId).update("status", newStatus);
+        }
     }
 
     private void removeImage() {
@@ -247,6 +300,10 @@ public class ModifyCategoryActivity extends AppCompatActivity {
         }
         if (colorEditText.getText().toString().charAt(0) != '#') {
             colorEditText.setError("Color should be HEX value");
+            isValid = false;
+        }
+        if (statusDropDown.getText().toString().trim().length() == 0) {
+            statusDropDown.setError("Status is required");
             isValid = false;
         }
 

@@ -64,8 +64,11 @@ public class ProductAdapter extends FirestoreRecyclerAdapter<ProductModel, Produ
         // 设置原价并添加删除线
         holder.originalPrice.setText("$ " + product.getOriginalPrice());
         holder.originalPrice.setPaintFlags(holder.originalPrice.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
-        // 计算折扣百分比并显示
-        int discountPerc = (product.getDiscount() * 100) / product.getOriginalPrice();
+        // 计算折扣百分比并显示（使用Math.round进行四舍五入，提高精度）
+        int discountPerc = 0;
+        if (product.getOriginalPrice() > 0) {
+            discountPerc = (int) Math.round((product.getDiscount() * 100.0) / product.getOriginalPrice());
+        }
         holder.discountPercentage.setText(discountPerc + "% OFF");
 
         // 设置点击事件：点击商品跳转到商品详情页面

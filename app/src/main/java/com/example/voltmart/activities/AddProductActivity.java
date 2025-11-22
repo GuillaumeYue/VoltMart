@@ -41,6 +41,7 @@ import com.google.firebase.firestore.SetOptions;
 import com.squareup.picasso.Callback;
 import com.squareup.picasso.Picasso;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -170,31 +171,41 @@ public class AddProductActivity extends AppCompatActivity {
     }
 
     private void getCategories(MyCallback myCallback) {
-        int size[] = new int[1];
-
+        // Get all categories and filter enabled ones (including those without status field for backward compatibility)
         FirebaseUtil.getCategories().orderBy("name")
                 .get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<QuerySnapshot> task) {
                         if (task.isSuccessful()) {
-                            size[0] = task.getResult().size();
-                        }
-                        myCallback.onCallback(size);
-                    }
-                });
-        categories = new String[size[0]];
-
-        FirebaseUtil.getCategories().orderBy("name")
-                .get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-                    @Override
-                    public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                        if (task.isSuccessful()) {
-                            int i = 0;
+                            List<String> enabledCategories = new ArrayList<>();
+                            // Filter: only include categories with status="Enabled" or status is null/empty (old data)
                             for (QueryDocumentSnapshot document : task.getResult()) {
-                                categories[i] = ((String) document.getData().get("name"));
-                                Log.i("Category", categories[i]);
-                                i++;
+                                String status = document.getString("status");
+                                // Include if status is null, empty, or "Enabled"
+                                if (status == null || status.isEmpty() || status.equals("Enabled")) {
+                                    String categoryName = document.getString("name");
+                                    if (categoryName != null && !categoryName.isEmpty()) {
+                                        enabledCategories.add(categoryName);
+                                    }
+                                }
                             }
+                            
+                            // Convert list to array
+                            categories = enabledCategories.toArray(new String[0]);
+                            
+                            // Call callback with size first (for backward compatibility with existing code)
+                            int[] size = new int[]{categories.length};
+                            myCallback.onCallback(size);
+                            
+                            // Then call callback with categories array to set up the adapter
+                            // This must be called after size callback to ensure categories array is not overwritten
+                            myCallback.onCallback(categories);
+                        } else {
+                            // If query fails, return empty array (not null to avoid crashes)
+                            Log.e("AddProductActivity", "Failed to load categories", task.getException());
+                            categories = new String[0];
+                            int[] size = new int[]{0};
+                            myCallback.onCallback(size);
                             myCallback.onCallback(categories);
                         }
                     }
@@ -221,19 +232,28 @@ public class AddProductActivity extends AppCompatActivity {
             return;
         }
         
-        // Validate and parse discount
+        // Validate and parse discount (as percentage)
         String discountStr = discountEditText.getText().toString().trim();
         if (discountStr.isEmpty()) {
             Toast.makeText(this, "Discount is required", Toast.LENGTH_SHORT).show();
             return;
         }
-        int discount;
+        int discountPercentage;
         try {
-            discount = Integer.parseInt(discountStr);
+            discountPercentage = Integer.parseInt(discountStr);
+            if (discountPercentage < 0 || discountPercentage > 100) {
+                Toast.makeText(this, "Discount must be between 0 and 100", Toast.LENGTH_SHORT).show();
+                return;
+            }
         } catch (NumberFormatException e) {
             Toast.makeText(this, "Invalid discount value", Toast.LENGTH_SHORT).show();
             return;
         }
+        
+        // Calculate discount amount from percentage (using Math.round for better accuracy)
+        int discountAmount = (int) Math.round((price * discountPercentage) / 100.0);
+        // Calculate final price (original price - discount amount)
+        int finalPrice = price - discountAmount;
         
         // Validate and parse stock
         String stockStr = stockEditText.getText().toString().trim();
@@ -260,7 +280,9 @@ public class AddProductActivity extends AppCompatActivity {
             }
         }
 
-        ProductModel model = new ProductModel(productName, sk, productImage, category, desc, spec, price, discount, price - discount, productId, stock, shareLink, 0f, 0);
+        // Store discount as amount (not percentage) for backward compatibility
+        // But calculate it from percentage input
+        ProductModel model = new ProductModel(productName, sk, productImage, category, desc, spec, price, discountAmount, finalPrice, productId, stock, shareLink, 0f, 0);
 //        Log.i("Link2", shareLink);
         FirebaseUtil.getProducts().add(model)
                 .addOnSuccessListener(new OnSuccessListener<DocumentReference>() {
@@ -441,19 +463,39 @@ public class AddProductActivity extends AppCompatActivity {
         getCategories(new MyCallback() {
             @Override
             public void onCallback(String[] cate) {
-                arrayAdapter = new ArrayAdapter<>(context, R.layout.dropdown_item, cate);
-                categoryDropDown.setAdapter(arrayAdapter);
-                categoryDropDown.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-                    @Override
-                    public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                        category = adapterView.getItemAtPosition(i).toString();
-                    }
-                });
+                if (cate == null || categoryDropDown == null) {
+                    Log.e("AddProductActivity", "Categories array or dropdown is null");
+                    return;
+                }
+                
+                // Ensure we have at least an empty array to avoid crashes
+                if (cate.length == 0) {
+                    Log.w("AddProductActivity", "No enabled categories found");
+                    cate = new String[]{"No categories available"}; // Prevent crash with empty adapter
+                }
+                
+                try {
+                    arrayAdapter = new ArrayAdapter<>(context, R.layout.dropdown_item, cate);
+                    categoryDropDown.setAdapter(arrayAdapter);
+                    categoryDropDown.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                        @Override
+                        public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                            String selectedCategory = adapterView.getItemAtPosition(i).toString();
+                            if (!selectedCategory.equals("No categories available")) {
+                                category = selectedCategory;
+                            }
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.e("AddProductActivity", "Error setting up category dropdown", e);
+                    Toast.makeText(context, "Error loading categories", Toast.LENGTH_SHORT).show();
+                }
             }
 
             @Override
             public void onCallback(int[] size) {
-                categories = new String[size[0]];
+                // Don't reinitialize categories array here - it will be set by the String[] callback
+                // This method is kept for backward compatibility but should not overwrite the categories array
             }
         });
     }

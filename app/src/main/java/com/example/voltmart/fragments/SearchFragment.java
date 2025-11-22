@@ -38,318 +38,330 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 搜索Fragment
- * 提供商品搜索功能
- * 功能包括：
- * - 实时搜索（用户输入时自动搜索）
- * - 灵活的关键词匹配（不需要精确匹配）
- * - 从内存中过滤商品（提高性能）
- * - 支持搜索商品名称、关键词、分类、描述等
+ * 搜索Fragment - 最简单直接的实现
  */
 public class SearchFragment extends Fragment {
 
-    // UI组件
-    private RecyclerView productRecyclerView;  // 商品列表RecyclerView
-    private SearchProductAdapter searchAdapter; // 搜索适配器
-    private MaterialSearchBar searchBar;        // 搜索栏
+    private RecyclerView productRecyclerView;
+    private SearchProductAdapter searchAdapter;
+    private MaterialSearchBar searchBar;
+    private EditText searchEditText;
+    
+    private static List<ProductModel> cachedProducts = new ArrayList<>();
+    private static boolean isLoadingProducts = false;
+    
+    private Handler handler = new Handler(Looper.getMainLooper());
+    private Runnable searchRunnable;
+    private TextWatcher textWatcher;
+    private androidx.activity.OnBackPressedCallback backPressedCallback;
 
-    // 数据
-    private List<ProductModel> allProducts = new ArrayList<>(); // 所有商品列表（从Firestore加载一次）
+    public static void updateProductCache(List<ProductModel> products) {
+        if (products != null) {
+            cachedProducts.clear();
+            cachedProducts.addAll(products);
+        }
+    }
 
-    // 状态管理
-    private androidx.activity.OnBackPressedCallback backPressedCallback; // 返回按钮回调
-    private String pendingSearchTerm = null;    // 待执行的搜索词（如果商品未加载完成时存储）
-    private Handler searchHandler = new Handler(Looper.getMainLooper()); // 搜索处理Handler
-    private Runnable searchRunnable;             // 搜索任务（用于防抖）
-
-    /**
-     * 创建Fragment视图
-     * 初始化UI组件、设置搜索监听器、加载商品数据
-     */
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_search, container, false);
 
         MainActivity activity = (MainActivity) getActivity();
         if (activity != null) {
-            activity.showSearchBar(); // 显示搜索栏
+            activity.showSearchBar();
         }
 
-        // 初始化RecyclerView
         productRecyclerView = view.findViewById(R.id.productRecyclerView);
         productRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
+        
+        searchAdapter = new SearchProductAdapter(new ArrayList<>(), getActivity());
+        productRecyclerView.setAdapter(searchAdapter);
 
         searchBar = getActivity().findViewById(R.id.searchBar);
-
+        
         if (searchBar != null) {
-            // 设置搜索栏监听器
-            searchBar.setOnSearchActionListener(new SimpleOnSearchActionListener() {
-                @Override
-                public void onSearchStateChanged(boolean enabled) {
-                    super.onSearchStateChanged(enabled);
-                    // 搜索栏关闭时返回首页
-                    if (!enabled && activity != null) {
-                        navigateBackToHome();
-                    }
-                }
-
-                @Override
-                public void onSearchConfirmed(CharSequence text) {
-                    super.onSearchConfirmed(text);
-                    // 获取搜索文本并执行搜索
-                    String searchText = "";
-                    if (text != null && text.length() > 0) {
-                        searchText = text.toString().trim();
-                    } else if (searchBar != null && searchBar.getText() != null) {
-                        searchText = searchBar.getText().toString().trim();
-                    }
-                    performSearch(searchText);
-                }
-
-                @Override
-                public void onButtonClicked(int buttonCode) {
-                    super.onButtonClicked(buttonCode);
-                    // 点击搜索栏按钮时返回首页
-                    if (activity != null) {
-                        navigateBackToHome();
-                    }
-                }
-            });
-            
-            // 设置实时搜索（用户输入时自动搜索）
-            setupRealTimeSearch();
+            setupSearchBar();
         }
 
-        // Fragment创建时加载所有商品（只加载一次）
-        loadAllProducts();
+        if (cachedProducts.isEmpty() && !isLoadingProducts) {
+            loadAllProducts();
+        }
 
         return view;
     }
 
-    /**
-     * 从Firestore加载所有商品
-     * 只加载一次，后续搜索在内存中进行
-     */
-    private void loadAllProducts() {
-        FirebaseUtil.getProducts().get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful() && task.getResult() != null && getActivity() != null) {
-                        allProducts.clear();
-                        for (QueryDocumentSnapshot document : task.getResult()) {
-                            ProductModel product = document.toObject(ProductModel.class);
-                            allProducts.add(product);
+    private void setupSearchBar() {
+        if (searchBar == null || getActivity() == null) {
+            return;
+        }
+
+        // 不覆盖MainActivity的监听器，只设置TextWatcher来监听文本变化
+        // MainActivity负责导航，SearchFragment只负责搜索逻辑
+        
+        // 设置TextWatcher - 使用多个延迟确保UI准备好
+        handler.postDelayed(() -> {
+            if (searchBar != null && getActivity() != null && isAdded()) {
+                searchEditText = findEditText(searchBar);
+                if (searchEditText != null) {
+                    attachTextWatcher();
+                } else {
+                    // 再试一次
+                    handler.postDelayed(() -> {
+                        if (searchBar != null && getActivity() != null && isAdded()) {
+                            searchEditText = findEditText(searchBar);
+                            if (searchEditText != null) {
+                                attachTextWatcher();
+                            }
                         }
-                        android.util.Log.d("SearchFragment", "Loaded " + allProducts.size() + " products");
-                        
-                        // If there's a pending search, perform it now
-                        if (pendingSearchTerm != null && !pendingSearchTerm.isEmpty()) {
-                            String searchToPerform = pendingSearchTerm;
-                            pendingSearchTerm = null;
-                            performSearch(searchToPerform);
-                        } else {
-                            // Don't show all products initially - wait for user to search
-                            updateAdapter(new ArrayList<>());
-                        }
-                    }
-                });
+                    }, 200);
+                }
+            }
+        }, 100);
+        
+        // 如果搜索栏已经有文本，立即执行搜索
+        handler.postDelayed(() -> {
+            if (searchBar != null && getActivity() != null && isAdded()) {
+                String currentText = searchBar.getText() != null ? searchBar.getText().toString().trim() : "";
+                if (!currentText.isEmpty()) {
+                    performSearch(currentText);
+                }
+            }
+        }, 300);
     }
 
-    /**
-     * Perform search with flexible keyword matching
-     */
+    private void attachTextWatcher() {
+        if (searchEditText == null || getActivity() == null || !isAdded()) {
+            return;
+        }
+        
+        // 移除旧的监听器
+        if (textWatcher != null) {
+            try {
+                searchEditText.removeTextChangedListener(textWatcher);
+            } catch (Exception e) {
+                // 忽略
+            }
+        }
+        
+        // 创建新的监听器
+        textWatcher = new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                // 取消之前的搜索
+                if (searchRunnable != null) {
+                    handler.removeCallbacks(searchRunnable);
+                }
+                
+                // 执行搜索
+                String searchText = s != null ? s.toString().trim() : "";
+                searchRunnable = () -> {
+                    if (getActivity() != null && isAdded()) {
+                        performSearch(searchText);
+                    }
+                };
+                handler.postDelayed(searchRunnable, 300);
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        };
+        
+        // 添加监听器
+        try {
+            searchEditText.addTextChangedListener(textWatcher);
+        } catch (Exception e) {
+            // 忽略
+        }
+    }
+
+    private EditText findEditText(View view) {
+        if (view instanceof EditText) {
+            return (EditText) view;
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                EditText found = findEditText(group.getChildAt(i));
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
     private void performSearch(String searchTerm) {
-        if (productRecyclerView == null || getActivity() == null) {
+        if (getActivity() == null || !isAdded()) {
+            return;
+        }
+        
+        if (productRecyclerView == null) {
+            View view = getView();
+            if (view != null) {
+                productRecyclerView = view.findViewById(R.id.productRecyclerView);
+                if (productRecyclerView != null && productRecyclerView.getLayoutManager() == null) {
+                    productRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
+                }
+            }
+        }
+        
+        if (productRecyclerView == null) {
             return;
         }
 
-        android.util.Log.d("SearchFragment", "Searching for: " + searchTerm + ", products loaded: " + allProducts.size());
+        String trimmedTerm = (searchTerm == null) ? "" : searchTerm.trim();
 
-        // If products haven't loaded yet, load them first and store the search term
-        if (allProducts.isEmpty()) {
-            android.util.Log.d("SearchFragment", "Products not loaded yet, loading now...");
-            pendingSearchTerm = searchTerm;
-            loadAllProducts();
+        if (trimmedTerm.isEmpty()) {
+            updateResults(new ArrayList<>());
             return;
         }
 
-        if (searchTerm == null || searchTerm.isEmpty()) {
-            // Show empty list if search is empty (don't show all products)
-            updateAdapter(new ArrayList<>());
+        if (cachedProducts.isEmpty()) {
+            if (!isLoadingProducts) {
+                loadAllProducts();
+            }
+            updateResults(new ArrayList<>());
             return;
         }
 
-        // Filter products with flexible matching
+        // 执行搜索过滤
+        String lowerSearchTerm = trimmedTerm.toLowerCase();
         List<ProductModel> filteredProducts = new ArrayList<>();
-        String lowerSearchTerm = searchTerm.toLowerCase().trim();
 
-        for (ProductModel product : allProducts) {
+        for (ProductModel product : cachedProducts) {
             if (matchesSearch(product, lowerSearchTerm)) {
                 filteredProducts.add(product);
             }
         }
 
-        android.util.Log.d("SearchFragment", "Found " + filteredProducts.size() + " matching products out of " + allProducts.size());
-        updateAdapter(filteredProducts);
+        updateResults(filteredProducts);
     }
 
-    /**
-     * Check if product matches search term (very flexible matching)
-     */
     private boolean matchesSearch(ProductModel product, String searchTerm) {
         if (product == null || searchTerm == null || searchTerm.isEmpty()) {
+            return false;
+        }
+
+        String name = product.getName();
+        if (name != null && name.toLowerCase().contains(searchTerm)) {
             return true;
         }
 
-        String lowerSearchTerm = searchTerm.toLowerCase().trim();
-        String normalizedSearch = lowerSearchTerm.replaceAll("\\s+", "");
-
-        // Check product name (most important)
-        String name = product.getName();
-        if (name != null && !name.isEmpty()) {
-            String lowerName = name.toLowerCase().trim();
-            String normalizedName = lowerName.replaceAll("\\s+", "");
-            
-            // Exact match (after normalization)
-            if (lowerName.equals(lowerSearchTerm) || normalizedName.equals(normalizedSearch)) {
-                return true;
-            }
-            
-            // Direct contains check (most common case) - handles "logitech" matching "Logitech G502"
-            if (lowerName.contains(lowerSearchTerm)) {
-                return true;
-            }
-            
-            // Normalized contains check (for "iphone" matching "iPhone 17 Pro Max")
-            if (normalizedName.contains(normalizedSearch)) {
-                return true;
-            }
-            
-            // Check if search term is contained in name (handles multi-word searches)
-            // e.g., "logitech g502" should match "Logitech G502"
-            if (lowerSearchTerm.contains(lowerName) || lowerName.contains(lowerSearchTerm)) {
-                return true;
-            }
-            
-            // Word-by-word matching for partial matches
-            String[] nameWords = lowerName.split("\\s+");
-            String[] searchWords = lowerSearchTerm.split("\\s+");
-            
-            // If search has multiple words, check if all search words appear in name
-            if (searchWords.length > 1) {
-                boolean allWordsFound = true;
-                for (String searchWord : searchWords) {
-                    if (searchWord.length() > 0) {
-                        boolean wordFound = false;
-                        for (String nameWord : nameWords) {
-                            if (nameWord.contains(searchWord) || searchWord.contains(nameWord)) {
-                                wordFound = true;
-                                break;
-                            }
-                        }
-                        if (!wordFound) {
-                            allWordsFound = false;
-                            break;
-                        }
-                    }
-                }
-                if (allWordsFound) {
-                    return true;
-                }
-            }
-            
-            // Check individual words for single-word or partial searches
-            for (String word : nameWords) {
-                if (word.length() > 0) {
-                    // Check if word starts with search term or search term starts with word
-                    if (word.startsWith(lowerSearchTerm) || lowerSearchTerm.startsWith(word)) {
-                        return true;
-                    }
-                    // Check if word contains search term (for partial matches)
-                    if (word.contains(lowerSearchTerm) || lowerSearchTerm.contains(word)) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        // Check searchKey array
         List<String> searchKeys = product.getSearchKey();
         if (searchKeys != null) {
             for (String key : searchKeys) {
-                if (key != null && !key.isEmpty()) {
-                    String lowerKey = key.toLowerCase().trim();
-                    String normalizedKey = lowerKey.replaceAll("\\s+", "");
-                    if (lowerKey.equals(lowerSearchTerm) || normalizedKey.equals(normalizedSearch)) {
-                        return true;
-                    }
-                    if (lowerKey.contains(lowerSearchTerm) || normalizedKey.contains(normalizedSearch)) {
-                        return true;
-                    }
+                if (key != null && key.toLowerCase().contains(searchTerm)) {
+                    return true;
                 }
             }
         }
 
-        // Check category
         String category = product.getCategory();
-        if (category != null && !category.isEmpty()) {
-            String lowerCategory = category.toLowerCase().trim();
-            String normalizedCategory = lowerCategory.replaceAll("\\s+", "");
-            if (lowerCategory.equals(lowerSearchTerm) || normalizedCategory.equals(normalizedSearch)) {
-                return true;
-            }
-            if (lowerCategory.contains(lowerSearchTerm) || normalizedCategory.contains(normalizedSearch)) {
-                return true;
-            }
-        }
-
-        // Check description
-        String description = product.getDescription();
-        if (description != null && !description.isEmpty()) {
-            String lowerDesc = description.toLowerCase().trim();
-            if (lowerDesc.contains(lowerSearchTerm)) {
-                return true;
-            }
+        if (category != null && category.toLowerCase().contains(searchTerm)) {
+            return true;
         }
 
         return false;
     }
 
-    /**
-     * Update RecyclerView adapter with filtered products
-     */
-    private void updateAdapter(List<ProductModel> products) {
-        if (productRecyclerView == null || getActivity() == null) {
+    private void updateResults(List<ProductModel> products) {
+        if (getActivity() == null || !isAdded()) {
+            return;
+        }
+        
+        if (productRecyclerView == null) {
+            View view = getView();
+            if (view != null) {
+                productRecyclerView = view.findViewById(R.id.productRecyclerView);
+            }
+        }
+        
+        if (productRecyclerView == null) {
             return;
         }
 
-        // Ensure layout manager is set
         if (productRecyclerView.getLayoutManager() == null) {
             productRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
         }
 
-        searchAdapter = new SearchProductAdapter(products, getActivity());
-        productRecyclerView.setAdapter(searchAdapter);
+        // 直接更新适配器
+        if (searchAdapter == null) {
+            searchAdapter = new SearchProductAdapter(products, getActivity());
+            productRecyclerView.setAdapter(searchAdapter);
+        } else {
+            searchAdapter.updateProducts(products);
+        }
+    }
+
+    private void loadAllProducts() {
+        if (isLoadingProducts) {
+            return;
+        }
+        
+        isLoadingProducts = true;
+        
+        FirebaseUtil.getProducts().get()
+                .addOnCompleteListener(task -> {
+                    isLoadingProducts = false;
+                    if (task.isSuccessful() && task.getResult() != null) {
+                        cachedProducts.clear();
+                        for (QueryDocumentSnapshot document : task.getResult()) {
+                            ProductModel product = document.toObject(ProductModel.class);
+                            cachedProducts.add(product);
+                        }
+                        
+                        // 如果搜索栏有文本，自动执行搜索
+                        if (getActivity() != null && isAdded() && searchBar != null) {
+                            String searchText = searchBar.getText() != null ? searchBar.getText().toString().trim() : "";
+                            if (!searchText.isEmpty()) {
+                                performSearch(searchText);
+                            }
+                        }
+                    }
+                });
     }
 
     @Override
     public void onResume() {
         super.onResume();
         
-        // Re-initialize searchBar if needed
-        if (searchBar == null && getActivity() instanceof MainActivity) {
-            searchBar = getActivity().findViewById(R.id.searchBar);
-            // Setup real-time search if searchBar was just initialized
+        // 确保RecyclerView和适配器存在
+        if (productRecyclerView == null && getView() != null) {
+            productRecyclerView = getView().findViewById(R.id.productRecyclerView);
+            if (productRecyclerView != null && productRecyclerView.getLayoutManager() == null) {
+                productRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
+            }
+        }
+        
+        if (searchAdapter == null && productRecyclerView != null) {
+            searchAdapter = new SearchProductAdapter(new ArrayList<>(), getActivity());
+            productRecyclerView.setAdapter(searchAdapter);
+        }
+        
+        if (getActivity() instanceof MainActivity) {
+            MainActivity activity = (MainActivity) getActivity();
+            activity.showSearchBar();
+            
+            searchBar = activity.findViewById(R.id.searchBar);
             if (searchBar != null) {
-                setupRealTimeSearch();
+                // 重新设置TextWatcher（每次onResume都重新设置）
+                setupSearchBar();
             }
         }
 
-        // Enable back button
         if (backPressedCallback == null && getActivity() != null) {
             backPressedCallback = new androidx.activity.OnBackPressedCallback(true) {
                 @Override
                 public void handleOnBackPressed() {
-                    navigateBackToHome();
+                    // 只关闭搜索栏，让MainActivity的监听器处理导航
+                    if (searchBar != null) {
+                        searchBar.closeSearch();
+                    }
                 }
             };
             getActivity().getOnBackPressedDispatcher().addCallback(this, backPressedCallback);
@@ -368,120 +380,66 @@ public class SearchFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        
         if (backPressedCallback != null) {
             backPressedCallback.remove();
             backPressedCallback = null;
         }
-        // Cancel any pending search
+        
         if (searchRunnable != null) {
-            searchHandler.removeCallbacks(searchRunnable);
+            handler.removeCallbacks(searchRunnable);
             searchRunnable = null;
         }
-    }
-
-    /**
-     * Setup real-time search as user types
-     */
-    private void setupRealTimeSearch() {
-        if (searchBar == null) {
-            return;
-        }
         
-        // Get the EditText from MaterialSearchBar using reflection or findViewWithTag
-        // MaterialSearchBar typically has an EditText as a child
-        View searchEditText = searchBar.findViewById(android.R.id.text1);
-        if (searchEditText == null) {
-            // Try to find EditText in the search bar
-            searchEditText = findEditTextInView(searchBar);
-        }
-        
-        if (searchEditText instanceof EditText) {
-            EditText editText = (EditText) searchEditText;
-            editText.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-                }
-
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    // Cancel previous search
-                    if (searchRunnable != null) {
-                        searchHandler.removeCallbacks(searchRunnable);
-                    }
-                    
-                    // Perform search after a short delay (debounce)
-                    String searchText = s != null ? s.toString().trim() : "";
-                    searchRunnable = () -> performSearch(searchText);
-                    searchHandler.postDelayed(searchRunnable, 300); // 300ms delay for better performance
-                }
-
-                @Override
-                public void afterTextChanged(Editable s) {
-                }
-            });
-        } else {
-            // Fallback: Use onSearchConfirmed only
-            android.util.Log.w("SearchFragment", "Could not find EditText in MaterialSearchBar for real-time search");
-        }
-    }
-    
-    /**
-     * Recursively find EditText in a view hierarchy
-     */
-    private EditText findEditTextInView(View view) {
-        if (view instanceof EditText) {
-            return (EditText) view;
-        }
-        if (view instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) view;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                EditText found = findEditTextInView(group.getChildAt(i));
-                if (found != null) {
-                    return found;
-                }
+        if (searchEditText != null && textWatcher != null) {
+            try {
+                searchEditText.removeTextChangedListener(textWatcher);
+            } catch (Exception e) {
+                // 忽略
             }
+            textWatcher = null;
         }
-        return null;
+        
+        // 清理所有引用
+        searchEditText = null;
+        searchBar = null;
+        productRecyclerView = null;
+        searchAdapter = null;
     }
 
     private void navigateBackToHome() {
+        // 这个方法现在不再使用，导航由MainActivity的监听器处理
+        // 保留方法以防其他地方调用
         MainActivity activity = (MainActivity) getActivity();
         if (activity == null) {
             return;
         }
 
-        // Clear search bar
+        // 只关闭搜索栏，让MainActivity的监听器处理导航
         if (searchBar != null) {
+            searchBar.closeSearch();
             searchBar.setText("");
-        }
-
-        // Hide search bar
-        activity.hideSearchBar();
-
-        // Navigate back - always pop back stack if available, otherwise go to home
-        if (activity.getSupportFragmentManager().getBackStackEntryCount() > 0) {
-            // Pop back stack to return to previous fragment
-            activity.getSupportFragmentManager().popBackStackImmediate();
-        } else {
-            // If no back stack, navigate to home fragment
-            HomeFragment homeFragment = new HomeFragment();
-            activity.getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.main_frame_layout, homeFragment, "home")
-                    .commitAllowingStateLoss();
         }
     }
 
     /**
-     * Simple RecyclerView adapter for search results
+     * 搜索适配器
      */
     private static class SearchProductAdapter extends RecyclerView.Adapter<SearchProductAdapter.ViewHolder> {
         private List<ProductModel> products;
         private android.app.Activity activity;
 
         public SearchProductAdapter(List<ProductModel> products, android.app.Activity activity) {
-            this.products = products;
+            this.products = products != null ? products : new ArrayList<>();
             this.activity = activity;
+        }
+
+        public void updateProducts(List<ProductModel> newProducts) {
+            this.products.clear();
+            if (newProducts != null) {
+                this.products.addAll(newProducts);
+            }
+            notifyDataSetChanged();
         }
 
         @NonNull
@@ -493,6 +451,10 @@ public class SearchFragment extends Fragment {
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+            if (position < 0 || position >= products.size()) {
+                return;
+            }
+            
             ProductModel product = products.get(position);
 
             holder.productNameTextView.setText(product.getName());

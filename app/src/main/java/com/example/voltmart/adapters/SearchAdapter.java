@@ -69,7 +69,11 @@ public class SearchAdapter extends FirestoreRecyclerAdapter<ProductModel, Search
         holder.productPriceTextView.setText("$ "+ product.getPrice());
         holder.originalPrice.setText("$ " + product.getOriginalPrice());
         holder.originalPrice.setPaintFlags(holder.originalPrice.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
-        int discountPerc = (product.getDiscount() * 100) / product.getOriginalPrice();
+        // 计算折扣百分比并显示（使用Math.round进行四舍五入，提高精度）
+        int discountPerc = 0;
+        if (product.getOriginalPrice() > 0) {
+            discountPerc = (int) Math.round((product.getDiscount() * 100.0) / product.getOriginalPrice());
+        }
         holder.discountPercentage.setText(discountPerc + "% OFF");
 
         DecimalFormat df = new DecimalFormat("#.#");

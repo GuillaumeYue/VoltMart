@@ -36,6 +36,15 @@
             android:name=".activities.AddProductActivity"
             android:exported="false" />
         <activity
+            android:name=".activities.DeleteProductActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activities.DeleteCategoryActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activities.DeleteBannerActivity"
+            android:exported="false" />
+        <activity
             android:name=".activities.AdminActivity"
             android:exported="false" />
         <activity

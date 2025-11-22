@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.voltmart.R;
 import com.example.voltmart.adapters.UsersListAdapter;
 import com.example.voltmart.model.UserModel;
+import com.example.voltmart.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -52,12 +53,10 @@ public class UsersListActivity extends AppCompatActivity {
         // 设置返回按钮点击事件
         backBtn.setOnClickListener(v -> onBackPressed());
 
-        // 首先尝试从users集合查询
-        // 如果失败或为空，可以从orders集合中提取用户信息
-        Query usersQuery = FirebaseFirestore.getInstance()
-                .collection("users");
+        // 从users集合查询所有用户
+        Query usersQuery = FirebaseUtil.getUsers();
         
-        // 先不使用orderBy，以防email字段不存在或缺少索引
+        // 创建FirestoreRecyclerOptions，不使用orderBy以防email字段不存在或缺少索引
         FirestoreRecyclerOptions<UserModel> options = new FirestoreRecyclerOptions.Builder<UserModel>()
                 .setQuery(usersQuery, UserModel.class)
                 .build();
@@ -69,14 +68,19 @@ public class UsersListActivity extends AppCompatActivity {
         usersRecyclerView.setAdapter(usersAdapter);
         
         // 检查users集合是否有数据，如果没有则记录日志
-        FirebaseFirestore.getInstance().collection("users")
+        FirebaseUtil.getUsers()
                 .limit(1)
                 .get()
                 .addOnCompleteListener(task -> {
-                    if (task.isSuccessful() && task.getResult() != null && task.getResult().size() == 0) {
-                        Log.d("UsersListActivity", "Users collection is empty, users may be stored in Firebase Auth only");
-                        // users集合为空 - 用户可能只存储在Firebase Auth中
-                        // 没有Admin SDK，我们无法从客户端列出Firebase Auth用户
+                    if (task.isSuccessful() && task.getResult() != null) {
+                        int userCount = task.getResult().size();
+                        if (userCount == 0) {
+                            Log.d("UsersListActivity", "Users collection is empty");
+                        } else {
+                            Log.d("UsersListActivity", "Found " + userCount + " user(s) in collection");
+                        }
+                    } else {
+                        Log.e("UsersListActivity", "Error checking users collection", task.getException());
                     }
                 });
     }

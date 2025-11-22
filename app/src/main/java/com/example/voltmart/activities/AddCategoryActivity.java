@@ -186,7 +186,7 @@ public class AddCategoryActivity extends AppCompatActivity {
         String desc = descEditText.getText().toString();
         String color = colorEditText.getText().toString();
 
-        CategoryModel category = new CategoryModel(name, categoryImage, color, desc, categoryId);
+        CategoryModel category = new CategoryModel(name, categoryImage, color, desc, categoryId, "Enabled");
 
         FirebaseUtil.getCategories().add(category)
                 .addOnSuccessListener(new OnSuccessListener<DocumentReference>() {

@@ -196,17 +196,40 @@ public class ModifyProductActivity extends AppCompatActivity {
                     }
                 });
 
+        // Get all categories and filter enabled ones (including those without status field for backward compatibility)
         FirebaseUtil.getCategories().orderBy("name")
                 .get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<QuerySnapshot> task) {
                         if (task.isSuccessful()) {
-                            size[0] = task.getResult().size();
+                            List<String> enabledCategories = new ArrayList<>();
+                            // Filter: only include categories with status="Enabled" or status is null/empty (old data)
+                            for (QueryDocumentSnapshot document : task.getResult()) {
+                                String status = document.getString("status");
+                                // Include if status is null, empty, or "Enabled"
+                                if (status == null || status.isEmpty() || status.equals("Enabled")) {
+                                    String categoryName = document.getString("name");
+                                    if (categoryName != null && !categoryName.isEmpty()) {
+                                        enabledCategories.add(categoryName);
+                                    }
+                                }
+                            }
+                            
+                            // Convert list to array
+                            categories = enabledCategories.toArray(new String[0]);
+                            size[0] = categories.length;
+                            myCallback.onCallback(size);
+                            // Also call callback with categories array to set up the adapter
+                            myCallback.onCallback(categories);
+                        } else {
+                            // If query fails, return empty array
+                            categories = new String[0];
+                            size[0] = 0;
+                            myCallback.onCallback(size);
+                            myCallback.onCallback(categories);
                         }
-                        myCallback.onCallback(size);
                     }
                 });
-        categories = new String[size[0]];
     }
 
     private void loadProductsWithoutOrderBy(MyCallback myCallback) {
@@ -285,8 +308,13 @@ public class ModifyProductActivity extends AppCompatActivity {
         descEditText.setText(currProduct.getDescription());
         specEditText.setText(currProduct.getSpecification());
         stockEditText.setText(currProduct.getStock() + "");
-        priceEditText.setText(currProduct.getPrice() + "");
-        discountEditText.setText(currProduct.getDiscount() + "");
+        priceEditText.setText(currProduct.getOriginalPrice() + ""); // Display original price, not final price
+        // Calculate and display discount as percentage (using Math.round for accuracy)
+        int discountPercentage = 0;
+        if (currProduct.getOriginalPrice() > 0) {
+            discountPercentage = (int) Math.round((currProduct.getDiscount() * 100.0) / currProduct.getOriginalPrice());
+        }
+        discountEditText.setText(discountPercentage + "");
     }
 
     private void removeImage() {
@@ -353,12 +381,35 @@ public class ModifyProductActivity extends AppCompatActivity {
             FirebaseUtil.getProducts().document(docId).update("specification", specEditText.getText().toString());
         if (!stockEditText.getText().toString().equals(currProduct.getStock() + ""))
             FirebaseUtil.getProducts().document(docId).update("stock", Integer.parseInt(stockEditText.getText().toString()));
-        if (!priceEditText.getText().toString().equals(currProduct.getOriginalPrice() + "")) {
-            FirebaseUtil.getProducts().document(docId).update("originalPrice", Integer.parseInt(priceEditText.getText().toString()));
-            FirebaseUtil.getProducts().document(docId).update("price", Integer.parseInt(priceEditText.getText().toString()) - Integer.parseInt(discountEditText.getText().toString()));
+        int originalPrice = Integer.parseInt(priceEditText.getText().toString());
+        int discountPercentage = Integer.parseInt(discountEditText.getText().toString());
+        
+        // Validate discount percentage
+        if (discountPercentage < 0 || discountPercentage > 100) {
+            Toast.makeText(context, "Discount must be between 0 and 100", Toast.LENGTH_SHORT).show();
+            return;
         }
-        if (!discountEditText.getText().toString().equals(currProduct.getDiscount() + ""))
-            FirebaseUtil.getProducts().document(docId).update("discount", Integer.parseInt(discountEditText.getText().toString()));
+        
+        // Calculate discount amount from percentage (using Math.round for better accuracy)
+        int discountAmount = (int) Math.round((originalPrice * discountPercentage) / 100.0);
+        int finalPrice = originalPrice - discountAmount;
+        
+        // Calculate current discount percentage for comparison (using Math.round for accuracy)
+        int currentDiscountPercentage = 0;
+        if (currProduct.getOriginalPrice() > 0) {
+            currentDiscountPercentage = (int) Math.round((currProduct.getDiscount() * 100.0) / currProduct.getOriginalPrice());
+        }
+        
+        if (!priceEditText.getText().toString().equals(currProduct.getOriginalPrice() + "")) {
+            FirebaseUtil.getProducts().document(docId).update("originalPrice", originalPrice);
+            FirebaseUtil.getProducts().document(docId).update("price", finalPrice);
+            // Also update discount amount when price changes
+            FirebaseUtil.getProducts().document(docId).update("discount", discountAmount);
+        }
+        if (discountPercentage != currentDiscountPercentage) {
+            FirebaseUtil.getProducts().document(docId).update("discount", discountAmount);
+            FirebaseUtil.getProducts().document(docId).update("price", finalPrice);
+        }
     }
 
     boolean validate() {
@@ -383,8 +434,15 @@ public class ModifyProductActivity extends AppCompatActivity {
             priceEditText.setError("Price is required");
             isValid = false;
         }
-        if (Integer.parseInt(discountEditText.getText().toString()) > Integer.parseInt(priceEditText.getText().toString())) {
-            priceEditText.setError("Price should be more than discount");
+        // Validate discount percentage (0-100)
+        try {
+            int discountPercentage = Integer.parseInt(discountEditText.getText().toString());
+            if (discountPercentage < 0 || discountPercentage > 100) {
+                discountEditText.setError("Discount must be between 0 and 100");
+                isValid = false;
+            }
+        } catch (NumberFormatException e) {
+            discountEditText.setError("Invalid discount value");
             isValid = false;
         }
         if (!imageUploaded) {

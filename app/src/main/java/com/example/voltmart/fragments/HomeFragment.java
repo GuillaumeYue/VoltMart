@@ -34,6 +34,9 @@ import com.mancj.materialsearchbar.MaterialSearchBar;
 import org.imaginativeworld.whynotimagecarousel.ImageCarousel;
 import org.imaginativeworld.whynotimagecarousel.model.CarouselItem;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 首页Fragment
  * 显示应用的主页内容，包括：
@@ -98,15 +101,21 @@ public class HomeFragment extends Fragment {
     /**
      * 初始化横幅轮播图
      * 从Firebase获取横幅数据并添加到轮播图中
+     * 显示状态为"Live"的横幅，或者status字段不存在/null的横幅（兼容旧数据）
      */
     private void initCarousel() {
+        // 获取所有横幅，然后在客户端过滤
         FirebaseUtil.getBanner().orderBy("bannerId").get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
             @Override
             public void onComplete(@NonNull Task<QuerySnapshot> task) {
                 if (task.isSuccessful()) {
-                    // 遍历所有横幅文档，添加到轮播图
+                    // 遍历所有横幅文档，只添加Live状态或status为null的（兼容旧数据）
                     for (QueryDocumentSnapshot document : task.getResult()) {
-                        carousel.addData(new CarouselItem(document.get("bannerImage").toString()));
+                        String status = document.getString("status");
+                        // 如果status为null（旧数据）或者是"Live"，则显示
+                        if (status == null || status.equals("Live")) {
+                            carousel.addData(new CarouselItem(document.get("bannerImage").toString()));
+                        }
                     }
                 }
             }
@@ -114,19 +123,26 @@ public class HomeFragment extends Fragment {
     }
 
     private void initCategories() {
-        // First check if categories exist
+        // First check if enabled categories exist (including those without status field for backward compatibility)
         FirebaseUtil.getCategories().get()
                 .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<QuerySnapshot> task) {
                         if (task.isSuccessful() && task.getResult() != null) {
-                            int categoryCount = task.getResult().size();
-                            Log.d("HomeFragment", "Categories count = " + categoryCount);
+                            // Count enabled categories (status="Enabled" or status is null/empty for backward compatibility)
+                            int enabledCount = 0;
+                            for (QueryDocumentSnapshot document : task.getResult()) {
+                                String status = document.getString("status");
+                                if (status == null || status.isEmpty() || status.equals("Enabled")) {
+                                    enabledCount++;
+                                }
+                            }
+                            Log.d("HomeFragment", "Enabled categories count = " + enabledCount);
                             
-                            if (categoryCount == 0) {
-                                Log.w("HomeFragment", "No categories found in database");
+                            if (enabledCount == 0) {
+                                Log.w("HomeFragment", "No enabled categories found in database");
                             } else {
-                                Log.d("HomeFragment", "Categories found, should be displaying");
+                                Log.d("HomeFragment", "Enabled categories found, should be displaying");
                                 // Make sure main layout is visible when categories load
                                 if (mainLinearLayout != null && mainLinearLayout.getVisibility() != View.VISIBLE) {
                                     shimmerFrameLayout.stopShimmer();
@@ -150,6 +166,9 @@ public class HomeFragment extends Fragment {
                     }
                 });
         
+        // Get all categories and filter in adapter - we'll use a custom query that gets all categories
+        // The adapter will need to filter, but FirestoreRecyclerAdapter doesn't support client-side filtering
+        // So we'll get all categories and filter in the query result
         Query query = FirebaseUtil.getCategories();
         FirestoreRecyclerOptions<CategoryModel> options = new FirestoreRecyclerOptions.Builder<CategoryModel>()
                 .setQuery(query, CategoryModel.class)
@@ -202,6 +221,7 @@ public class HomeFragment extends Fragment {
     }
 
     private void initProducts() {
+        // 先获取产品数据，用于更新SearchFragment缓存
         FirebaseUtil.getProducts()
                 .get()
                 .addOnCompleteListener(task -> {
@@ -213,6 +233,19 @@ public class HomeFragment extends Fragment {
                         shimmerFrameLayout.stopShimmer();
                         shimmerFrameLayout.setVisibility(View.GONE);
                         mainLinearLayout.setVisibility(View.VISIBLE);
+                        
+                        // 更新SearchFragment的缓存，实现预加载
+                        // 这样用户进入搜索页面时，产品已经加载好了
+                        if (task.getResult() != null) {
+                            List<ProductModel> products = new ArrayList<>();
+                            for (QueryDocumentSnapshot document : task.getResult()) {
+                                ProductModel product = document.toObject(ProductModel.class);
+                                products.add(product);
+                            }
+                            // 更新SearchFragment的缓存
+                            SearchFragment.updateProductCache(products);
+                            Log.d("HomeFragment", "Updated SearchFragment cache with " + products.size() + " products");
+                        }
                     }
 
                 });

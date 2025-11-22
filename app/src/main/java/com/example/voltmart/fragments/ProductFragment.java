@@ -187,7 +187,11 @@ public class ProductFragment extends Fragment {
         Log.i("image", currentProduct.getImage() + "");
         Picasso.get().load(currentProduct.getImage()).into(productImage);
         productName.setText(currentProduct.getName());
-        int discountPerc = (currentProduct.getDiscount() * 100) / currentProduct.getOriginalPrice();
+        // 计算折扣百分比并显示（使用Math.round进行四舍五入，提高精度）
+        int discountPerc = 0;
+        if (currentProduct.getOriginalPrice() > 0) {
+            discountPerc = (int) Math.round((currentProduct.getDiscount() * 100.0) / currentProduct.getOriginalPrice());
+        }
         productPrice.setText("$ " + currentProduct.getPrice());
         originalPrice.setText("$ " + currentProduct.getOriginalPrice());
         originalPrice.setPaintFlags(originalPrice.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);

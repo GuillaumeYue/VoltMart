@@ -156,6 +156,14 @@ public class AddBannerActivity extends AppCompatActivity {
         }
         
         String bannerDesc = descEditText.getText().toString();
+        
+        // Get status from dropdown if not set
+        if (status == null || status.trim().isEmpty()) {
+            status = statusDropDown.getText().toString().trim();
+            if (status.isEmpty()) {
+                status = "Not Live"; // Default to "Not Live"
+            }
+        }
 
         BannerModel banner = new BannerModel(bannerId, bannerImage, bannerDesc, status);
 

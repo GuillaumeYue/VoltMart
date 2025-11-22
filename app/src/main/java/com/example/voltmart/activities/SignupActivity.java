@@ -20,6 +20,8 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import com.example.voltmart.R;
+import com.example.voltmart.model.UserModel;
+import com.example.voltmart.utils.FirebaseUtil;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
@@ -102,11 +104,23 @@ public class SignupActivity extends AppCompatActivity {
                     public void onComplete(@NonNull Task<AuthResult> task) {
                         changeInProgress(false);
                         if (task.isSuccessful()){
+                            FirebaseUser firebaseUser = firebaseAuth.getCurrentUser();
+                            if (firebaseUser != null) {
+                                // 发送邮箱验证
+                                firebaseUser.sendEmailVerification();
+                                
+                                // 更新用户显示名称
+                                String displayName = nameEditText.getText().toString();
+                                UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder()
+                                        .setDisplayName(displayName)
+                                        .build();
+                                firebaseUser.updateProfile(profileUpdates);
+                                
+                                // 将用户信息保存到Firestore
+                                saveUserToFirestore(firebaseUser, displayName);
+                            }
+                            
                             Toast.makeText(SignupActivity.this, "Successfully created account, check email to verify", Toast.LENGTH_SHORT).show();
-                            firebaseAuth.getCurrentUser().sendEmailVerification();
-                            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-                            UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder().setDisplayName(nameEditText.getText().toString()).build();
-                            user.updateProfile(profileUpdates);
                             firebaseAuth.signOut();
                             finish();
                         }
@@ -138,6 +152,40 @@ public class SignupActivity extends AppCompatActivity {
             flag=1;
         }
         return flag == 0;
+    }
+
+    /**
+     * 将用户信息保存到Firestore的users集合
+     * @param firebaseUser Firebase用户对象
+     * @param displayName 用户显示名称
+     */
+    private void saveUserToFirestore(FirebaseUser firebaseUser, String displayName) {
+        if (firebaseUser == null) return;
+        
+        String uid = firebaseUser.getUid();
+        String email = firebaseUser.getEmail();
+        String phoneNumber = firebaseUser.getPhoneNumber();
+        
+        // 创建UserModel对象
+        UserModel userModel = new UserModel(
+                uid,
+                email != null ? email : "",
+                displayName != null && !displayName.isEmpty() ? displayName : "",
+                phoneNumber != null ? phoneNumber : ""
+        );
+        
+        // 保存到Firestore，使用uid作为文档ID
+        FirebaseUtil.getUsers().document(uid).set(userModel)
+                .addOnCompleteListener(new OnCompleteListener<Void>() {
+                    @Override
+                    public void onComplete(@NonNull Task<Void> task) {
+                        if (task.isSuccessful()) {
+                            android.util.Log.d("SignupActivity", "User saved to Firestore successfully");
+                        } else {
+                            android.util.Log.e("SignupActivity", "Failed to save user to Firestore", task.getException());
+                        }
+                    }
+                });
     }
 
 }

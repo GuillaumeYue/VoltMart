@@ -42,12 +42,36 @@ public class CategoryAdapter extends FirestoreRecyclerAdapter<CategoryModel, Cat
     /**
      * 绑定ViewHolder数据
      * 将分类数据绑定到ViewHolder的UI组件上，并设置点击事件
+     * 只显示status为"Enabled"或status为null的分类（兼容旧数据）
      * @param categoryViewHolder ViewHolder实例
      * @param i 位置
      * @param categoryModel 分类数据模型
      */
     @Override
     protected void onBindViewHolder(@NonNull CategoryViewHolder categoryViewHolder, int i, @NonNull CategoryModel categoryModel) {
+        // 检查status：只显示"Enabled"或null（旧数据）的分类
+        String status = categoryModel.getStatus();
+        if (status != null && status.equals("Disabled")) {
+            // 隐藏已禁用的分类：设置高度为0，宽度为0，并隐藏
+            ViewGroup.LayoutParams params = categoryViewHolder.itemView.getLayoutParams();
+            if (params != null) {
+                params.height = 0;
+                params.width = 0;
+                categoryViewHolder.itemView.setLayoutParams(params);
+            }
+            categoryViewHolder.itemView.setVisibility(View.GONE);
+            return;
+        }
+        
+        // 显示分类项：确保可见并恢复布局参数
+        categoryViewHolder.itemView.setVisibility(View.VISIBLE);
+        ViewGroup.LayoutParams params = categoryViewHolder.itemView.getLayoutParams();
+        if (params != null) {
+            params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            params.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+            categoryViewHolder.itemView.setLayoutParams(params);
+        }
+        
         // 设置分类名称
         categoryViewHolder.categoryLabel.setText(categoryModel.getName());
         // 使用Picasso加载分类图标

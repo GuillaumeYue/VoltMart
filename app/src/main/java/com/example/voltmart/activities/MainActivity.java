@@ -126,32 +126,82 @@ public class MainActivity extends AppCompatActivity {
         bottomNavigationView.setSelectedItemId(R.id.home); // 默认选中首页
         addOrRemoveBadge(); // 更新购物车徽章
 
-        // 监听Fragment返回栈变化，更新底部导航选中状态
+        // 监听Fragment返回栈变化，更新底部导航选中状态和搜索栏显示
         getSupportFragmentManager().addOnBackStackChangedListener(new FragmentManager.OnBackStackChangedListener() {
             @Override
             public void onBackStackChanged() {
                 updateBottomNavigationSelectedItem(); // 更新底部导航选中项
+                
+                // 根据当前Fragment显示/隐藏搜索栏
+                Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.main_frame_layout);
+                if (currentFragment instanceof SearchFragment) {
+                    showSearchBar(); // SearchFragment时显示搜索栏
+                } else if (currentFragment instanceof HomeFragment) {
+                    showSearchBar(); // HomeFragment时显示搜索栏
+                } else {
+                    hideSearchBar(); // 其他Fragment时隐藏搜索栏
+                }
             }
         });
 
-        // 设置搜索栏监听器
+        // 设置搜索栏点击监听器 - 点击时导航到搜索Fragment（每次都创建新实例）
+        // 这个监听器始终存在，不会被SearchFragment覆盖
         searchBar.setOnSearchActionListener(new SimpleOnSearchActionListener() {
             @Override
             public void onSearchStateChanged(boolean enabled) {
                 super.onSearchStateChanged(enabled);
+                // 当搜索栏打开时，导航到搜索Fragment（创建新实例）
+                if (enabled) {
+                    Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.main_frame_layout);
+                    if (!(currentFragment instanceof SearchFragment)) {
+                        SearchFragment newSearchFragment = new SearchFragment();
+                        getSupportFragmentManager().beginTransaction()
+                                .replace(R.id.main_frame_layout, newSearchFragment, "search")
+                                .addToBackStack(null)
+                                .commit();
+                    }
+                } else {
+                    // 搜索栏关闭时，如果当前是SearchFragment，返回home
+                    Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.main_frame_layout);
+                    if (currentFragment instanceof SearchFragment) {
+                        if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+                            getSupportFragmentManager().popBackStackImmediate();
+                        } else {
+                            HomeFragment homeFragment = new HomeFragment();
+                            getSupportFragmentManager()
+                                    .beginTransaction()
+                                    .replace(R.id.main_frame_layout, homeFragment, "home")
+                                    .commitAllowingStateLoss();
+                        }
+                        // 不隐藏搜索栏，让返回栈监听器处理显示/隐藏
+                    }
+                }
             }
 
             @Override
             public void onSearchConfirmed(CharSequence text) {
-                // 搜索确认时，如果搜索Fragment未添加则添加它
-                if (!searchFragment.isAdded())
-                    getSupportFragmentManager().beginTransaction().replace(R.id.main_frame_layout, searchFragment, "search").addToBackStack(null).commit();
                 super.onSearchConfirmed(text);
+                // 搜索确认时，确保在搜索Fragment中（创建新实例）
+                Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.main_frame_layout);
+                if (!(currentFragment instanceof SearchFragment)) {
+                    SearchFragment newSearchFragment = new SearchFragment();
+                    getSupportFragmentManager().beginTransaction()
+                            .replace(R.id.main_frame_layout, newSearchFragment, "search")
+                            .addToBackStack(null)
+                            .commit();
+                }
             }
 
             @Override
             public void onButtonClicked(int buttonCode) {
                 super.onButtonClicked(buttonCode);
+                // 返回按钮被点击时，关闭搜索栏并返回home
+                Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.main_frame_layout);
+                if (currentFragment instanceof SearchFragment) {
+                    searchBar.closeSearch();
+                    // 不在这里处理导航，让onSearchStateChanged(false)处理
+                    // 不隐藏搜索栏，让返回栈监听器处理显示/隐藏
+                }
             }
         });
 

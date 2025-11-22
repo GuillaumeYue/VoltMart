@@ -10,6 +10,7 @@ public class CategoryModel {
     private String color;     // 分类颜色
     private String brief;     // 分类简介
     private int categoryId;   // 分类唯一ID
+    private String status;    // 分类状态（"Enabled"或"Disabled"）
 
     /**
      * 无参构造函数
@@ -26,13 +27,15 @@ public class CategoryModel {
      * @param color 分类颜色
      * @param brief 分类简介
      * @param categoryId 分类ID
+     * @param status 分类状态
      */
-    public CategoryModel(String name, String icon, String color, String brief, int categoryId) {
+    public CategoryModel(String name, String icon, String color, String brief, int categoryId, String status) {
         this.name = name;
         this.icon = icon;
         this.color = color;
         this.brief = brief;
         this.categoryId = categoryId;
+        this.status = status;
     }
 
     public String getName() {
@@ -73,5 +76,13 @@ public class CategoryModel {
 
     public void setCategoryId(int categoryId) {
         this.categoryId = categoryId;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }
