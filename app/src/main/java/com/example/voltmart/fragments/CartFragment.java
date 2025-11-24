@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Color;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -33,7 +34,12 @@ import com.example.voltmart.model.CartItemModel;
 import com.example.voltmart.utils.FirebaseUtil;
 import com.facebook.shimmer.ShimmerFrameLayout;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
+import cn.pedant.SweetAlert.SweetAlertDialog;
 
 /**
  * 购物车Fragment
@@ -50,6 +56,7 @@ public class CartFragment extends Fragment implements CartAdapter.CartAdapterLis
     TextView cartPriceTextView;      // 购物车总价显示
     RecyclerView cartRecyclerView;   // 购物车商品列表
     Button continueBtn;              // 继续结账按钮
+    Button clearCartBtn;              // 清空购物车按钮
     ImageView backBtn;               // 返回按钮
     ImageView emptyCartImageView;    // 空购物车图片
     CartAdapter cartAdapter;         // 购物车适配器
@@ -79,6 +86,7 @@ public class CartFragment extends Fragment implements CartAdapter.CartAdapterLis
         cartPriceTextView = view.findViewById(R.id.cartPriceTextView);
         cartRecyclerView = view.findViewById(R.id.cartRecyclerView);
         continueBtn = view.findViewById(R.id.continueBtn);
+        clearCartBtn = view.findViewById(R.id.clearCartBtn);
         backBtn = view.findViewById(R.id.backBtn);
         emptyCartImageView = view.findViewById(R.id.emptyCartImageView);
         shimmerFrameLayout = view.findViewById(R.id.shimmerLayout);
@@ -108,6 +116,11 @@ public class CartFragment extends Fragment implements CartAdapter.CartAdapterLis
             Intent intent = new Intent(getActivity(), CheckoutActivity.class);
             intent.putExtra("price", totalPrice);
             startActivity(intent);
+        });
+
+        // 设置清空购物车按钮点击事件
+        clearCartBtn.setOnClickListener(v -> {
+            clearCart();
         });
 
         // 设置返回按钮点击事件
@@ -173,6 +186,90 @@ public class CartFragment extends Fragment implements CartAdapter.CartAdapterLis
         if (mainLinearLayout != null) {
             mainLinearLayout.setVisibility(View.VISIBLE);
         }
+    }
+
+    private void clearCart() {
+        if (totalPrice == 0) {
+            Toast.makeText(getActivity(), "Your cart is already empty!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        SweetAlertDialog alertDialog = new SweetAlertDialog(getActivity(), SweetAlertDialog.WARNING_TYPE);
+        alertDialog
+                .setTitleText("Clear Cart?")
+                .setContentText("Are you sure you want to remove all items from your cart? This action cannot be undone.")
+                .setConfirmText("Yes, Clear")
+                .setCancelText("Cancel")
+                .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
+                    @Override
+                    public void onClick(SweetAlertDialog sweetAlertDialog) {
+                        sweetAlertDialog.dismissWithAnimation();
+                        
+                        SweetAlertDialog progressDialog = new SweetAlertDialog(getActivity(), SweetAlertDialog.PROGRESS_TYPE);
+                        progressDialog.getProgressHelper().setBarColor(Color.parseColor("#A5DC86"));
+                        progressDialog.setTitleText("Clearing cart...");
+                        progressDialog.setCancelable(false);
+                        progressDialog.show();
+
+                        FirebaseUtil.getCartItems().get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                            @Override
+                            public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                                if (task.isSuccessful()) {
+                                    int itemCount = task.getResult().size();
+                                    if (itemCount == 0) {
+                                        progressDialog.dismissWithAnimation();
+                                        Toast.makeText(getActivity(), "Cart is already empty!", Toast.LENGTH_SHORT).show();
+                                        return;
+                                    }
+
+                                    final int[] deletedCount = {0};
+                                    for (QueryDocumentSnapshot document : task.getResult()) {
+                                        String docId = document.getId();
+                                        FirebaseUtil.getCartItems().document(docId)
+                                                .delete()
+                                                .addOnCompleteListener(new OnCompleteListener<Void>() {
+                                                    @Override
+                                                    public void onComplete(@NonNull Task<Void> deleteTask) {
+                                                        deletedCount[0]++;
+                                                        if (deletedCount[0] == itemCount) {
+                                                            progressDialog.dismissWithAnimation();
+                                                            new SweetAlertDialog(getActivity(), SweetAlertDialog.SUCCESS_TYPE)
+                                                                    .setTitleText("Cart Cleared!")
+                                                                    .setContentText("All items have been removed from your cart")
+                                                                    .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
+                                                                        @Override
+                                                                        public void onClick(SweetAlertDialog sweetAlertDialog) {
+                                                                            sweetAlertDialog.dismissWithAnimation();
+                                                                        }
+                                                                    })
+                                                                    .show();
+                                                            
+                                                            MainActivity activity = (MainActivity) getActivity();
+                                                            if (activity != null) {
+                                                                activity.addOrRemoveBadge();
+                                                            }
+                                                            
+                                                            totalPrice = 0;
+                                                            cartPriceTextView.setText("$ 0");
+                                                        }
+                                                    }
+                                                });
+                                    }
+                                } else {
+                                    progressDialog.dismissWithAnimation();
+                                    Toast.makeText(getActivity(), "Failed to clear cart. Please try again.", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        });
+                    }
+                })
+                .setCancelClickListener(new SweetAlertDialog.OnSweetClickListener() {
+                    @Override
+                    public void onClick(SweetAlertDialog sweetAlertDialog) {
+                        sweetAlertDialog.cancel();
+                    }
+                })
+                .show();
     }
 
     @Override
