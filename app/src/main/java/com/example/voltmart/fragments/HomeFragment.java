@@ -8,6 +8,7 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import androidx.appcompat.app.AlertDialog;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -51,10 +52,14 @@ public class HomeFragment extends Fragment {
     ImageCarousel carousel;             // 横幅轮播图
     ShimmerFrameLayout shimmerFrameLayout; // Shimmer加载效果布局
     LinearLayout mainLinearLayout;      // 主内容布局
+    TextView sortBtn;                    // 排序按钮
 
     // 适配器
     CategoryAdapter categoryAdapter;  // 分类适配器
     ProductAdapter productAdapter;     // 商品适配器
+    
+    // 排序状态
+    String currentSort = "default";     // 当前排序方式：default, price_asc, price_desc
 
 //    TextView textView;
 
@@ -82,10 +87,14 @@ public class HomeFragment extends Fragment {
         carousel = view.findViewById(R.id.carousel);
         shimmerFrameLayout = view.findViewById(R.id.shimmerLayout);
         mainLinearLayout = view.findViewById(R.id.mainLinearLayout);
+        sortBtn = view.findViewById(R.id.sortBtn);
 
         MainActivity activity = (MainActivity) getActivity();
         activity.showSearchBar(); // 显示搜索栏
         shimmerFrameLayout.startShimmer(); // 启动Shimmer加载效果
+
+        // 设置排序按钮点击事件
+        sortBtn.setOnClickListener(v -> showSortDialog());
 
         // 初始化各个组件
         initCarousel();    // 初始化横幅轮播图
@@ -217,15 +226,64 @@ public class HomeFragment extends Fragment {
 
                 });
 
+        loadProductsWithSort();
+    }
+
+    private void loadProductsWithSort() {
         Query query = FirebaseUtil.getProducts();
+        
+        if (currentSort.equals("price_asc")) {
+            query = query.orderBy("price", Query.Direction.ASCENDING);
+        } else if (currentSort.equals("price_desc")) {
+            query = query.orderBy("price", Query.Direction.DESCENDING);
+        }
+        
         FirestoreRecyclerOptions<ProductModel> options = new FirestoreRecyclerOptions.Builder<ProductModel>()
                 .setQuery(query, ProductModel.class)
                 .build();
 
+        if (productAdapter != null) {
+            productAdapter.stopListening();
+        }
+        
         productAdapter = new ProductAdapter(options, getContext());
-        productRecyclerView.setLayoutManager(new GridLayoutManager(getContext(), 2));
+        if (productRecyclerView.getLayoutManager() == null) {
+            productRecyclerView.setLayoutManager(new GridLayoutManager(getContext(), 2));
+        }
         productRecyclerView.setAdapter(productAdapter);
         productAdapter.startListening();
+    }
+
+    private void showSortDialog() {
+        String[] sortOptions = {
+            "Default",
+            "Price: Low to High",
+            "Price: High to Low"
+        };
+        
+        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+        builder.setTitle("Sort Products");
+        builder.setItems(sortOptions, (dialog, which) -> {
+            String newSort = "default";
+            switch (which) {
+                case 0:
+                    newSort = "default";
+                    break;
+                case 1:
+                    newSort = "price_asc";
+                    break;
+                case 2:
+                    newSort = "price_desc";
+                    break;
+            }
+            
+            if (!newSort.equals(currentSort)) {
+                currentSort = newSort;
+                loadProductsWithSort();
+            }
+            dialog.dismiss();
+        });
+        builder.show();
     }
 
 }

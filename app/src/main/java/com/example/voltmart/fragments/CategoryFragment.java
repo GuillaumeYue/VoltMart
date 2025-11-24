@@ -4,6 +4,7 @@ import static com.example.voltmart.utils.FirebaseUtil.getProducts;
 
 import android.os.Bundle;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -37,10 +38,13 @@ public class CategoryFragment extends Fragment {
     SearchAdapter searchProductAdapter; // 商品适配器
     ImageView backBtn;                 // 返回按钮
     TextView labelTextView;            // 分类名称标签
+    TextView sortBtn;                   // 排序按钮
 
     // 数据
     String categoryName;               // 分类名称
     private android.os.Handler categoryCheckHandler; // 分类检查Handler（用于超时检查）
+    String currentSort = "default";     // 当前排序方式：default, price_asc, price_desc
+    String currentCategoryForSort;     // 当前用于排序的分类名称
 
     /**
      * 无参构造函数
@@ -63,6 +67,7 @@ public class CategoryFragment extends Fragment {
         labelTextView = view.findViewById(R.id.labelTextView);
         productRecyclerView = view.findViewById(R.id.productRecyclerView);
         backBtn = view.findViewById(R.id.backBtn);
+        sortBtn = view.findViewById(R.id.sortBtn);
 
         // 从参数中获取分类名称（带空值安全检查）
         Bundle args = getArguments();
@@ -84,6 +89,11 @@ public class CategoryFragment extends Fragment {
                 if (activity != null) {
                     activity.onBackPressed();
                 }
+            });
+            
+            // 设置排序按钮点击事件
+            sortBtn.setOnClickListener(v -> {
+                showSortDialog();
             });
         }
         return view;
@@ -193,6 +203,13 @@ public class CategoryFragment extends Fragment {
             }
             
             Query query = FirebaseUtil.getProducts().whereEqualTo("category", categoryToTry);
+            
+            if (currentSort.equals("price_asc")) {
+                query = query.orderBy("price", Query.Direction.ASCENDING);
+            } else if (currentSort.equals("price_desc")) {
+                query = query.orderBy("price", Query.Direction.DESCENDING);
+            }
+            
             FirestoreRecyclerOptions<ProductModel> options = new FirestoreRecyclerOptions.Builder<ProductModel>()
                     .setQuery(query, ProductModel.class)
                     .build();
@@ -362,5 +379,38 @@ public class CategoryFragment extends Fragment {
             }
         }
         return camelCase.toString();
+    }
+
+    private void showSortDialog() {
+        String[] sortOptions = {
+            "Default",
+            "Price: Low to High",
+            "Price: High to Low"
+        };
+        
+        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+        builder.setTitle("Sort Products");
+        builder.setItems(sortOptions, (dialog, which) -> {
+            String newSort = "default";
+            switch (which) {
+                case 0:
+                    newSort = "default";
+                    break;
+                case 1:
+                    newSort = "price_asc";
+                    break;
+                case 2:
+                    newSort = "price_desc";
+                    break;
+            }
+            
+            if (!newSort.equals(currentSort)) {
+                currentSort = newSort;
+                currentCategoryForSort = categoryName;
+                getProducts(categoryName);
+            }
+            dialog.dismiss();
+        });
+        builder.show();
     }
 }
