@@ -25,6 +25,8 @@ import androidx.core.view.WindowInsetsCompat;
 import com.example.voltmart.R;
 import com.example.voltmart.model.BannerModel;
 import com.example.voltmart.utils.FirebaseUtil;
+import com.example.voltmart.utils.WindowInsetsHelper;
+import android.widget.LinearLayout;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -62,6 +64,11 @@ public class AddBannerActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_add_banner);
+        
+        LinearLayout topLayout = findViewById(R.id.topHeaderLayout);
+        if (topLayout != null) {
+            WindowInsetsHelper.applyTopWindowInsets(topLayout, 4);
+        }
 
         idEditText = findViewById(R.id.idEditText);
         statusDropDown = findViewById(R.id.statusDropDown);

@@ -22,6 +22,8 @@ import androidx.core.view.WindowInsetsCompat;
 import com.example.voltmart.R;
 import com.example.voltmart.model.CategoryModel;
 import com.example.voltmart.utils.FirebaseUtil;
+import com.example.voltmart.utils.WindowInsetsHelper;
+import android.widget.LinearLayout;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -39,41 +41,36 @@ import java.util.Map;
 
 import cn.pedant.SweetAlert.SweetAlertDialog;
 
-/**
- * 添加分类活动页面
- * 管理员添加新商品分类到系统
- * 功能包括：
- * - 输入分类信息（ID、名称、描述、颜色）
- * - 上传分类图标
- * - 保存分类到Firebase
- */
 public class AddCategoryActivity extends AppCompatActivity {
 
-    // UI组件 - 输入框
-    TextInputEditText idEditText;      // 分类ID输入框
-    TextInputEditText nameEditText;    // 分类名称输入框
-    TextInputEditText descEditText;    // 分类描述输入框
-    TextInputEditText colorEditText;   // 分类颜色输入框
-    Button imageBtn;                   // 选择图片按钮
-    Button addCategoryBtn;             // 添加分类按钮
-    ImageView backBtn;                 // 返回按钮
-    ImageView categoryImageView;       // 分类图标预览
-    TextView removeImageBtn;            // 移除图片按钮
+    TextInputEditText idEditText;
+    TextInputEditText nameEditText;
+    TextInputEditText descEditText;
+    TextInputEditText colorEditText;
+    Button imageBtn;
+    Button addCategoryBtn;
+    ImageView backBtn;
+    ImageView categoryImageView;
+    TextView removeImageBtn;
 
-    // 数据
-    String categoryImage;  // 分类图标URL
-    String productName;    // 产品名称（可能未使用）
-    int categoryId = 1;     // 分类ID（初始化为默认值1）
-    Context context = this; // 上下文
-    boolean imageUploaded = false; // 图片是否已上传
+    String categoryImage;
+    String productName;
+    int categoryId = 1;
+    Context context = this;
+    boolean imageUploaded = false;
 
-    SweetAlertDialog dialog; // 进度对话框
+    SweetAlertDialog dialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_add_category);
+        
+        LinearLayout topLayout = findViewById(R.id.topHeaderLayout);
+        if (topLayout != null) {
+            WindowInsetsHelper.applyTopWindowInsets(topLayout, 4);
+        }
 
         idEditText = findViewById(R.id.idEditText);
         nameEditText = findViewById(R.id.nameEditText);

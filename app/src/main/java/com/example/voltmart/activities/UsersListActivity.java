@@ -15,40 +15,36 @@ import com.example.voltmart.R;
 import com.example.voltmart.adapters.UsersListAdapter;
 import com.example.voltmart.model.UserModel;
 import com.example.voltmart.utils.FirebaseUtil;
+import com.example.voltmart.utils.WindowInsetsHelper;
+import android.widget.LinearLayout;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 
-/**
- * 用户列表活动页面
- * 管理员查看所有注册用户列表
- * 从Firestore的users集合中获取用户数据
- */
 public class UsersListActivity extends AppCompatActivity {
 
-    // UI组件
-    private RecyclerView usersRecyclerView; // 用户列表RecyclerView
-    private UsersListAdapter usersAdapter;   // 用户列表适配器
-    private ImageView backBtn;               // 返回按钮
-    private TextView titleTextView;          // 标题文本
+    private RecyclerView usersRecyclerView;
+    private UsersListAdapter usersAdapter;
+    private ImageView backBtn;
+    private TextView titleTextView;
 
-    /**
-     * 活动创建时的初始化方法
-     * 初始化UI组件并加载所有用户
-     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this); // 启用边缘到边缘显示
+        EdgeToEdge.enable(this);
         setContentView(R.layout.activity_users_list);
+        
+        LinearLayout topLayout = findViewById(R.id.topHeaderLayout);
+        if (topLayout != null) {
+            WindowInsetsHelper.applyTopWindowInsets(topLayout, 4);
+        }
 
-        // 初始化UI组件
         usersRecyclerView = findViewById(R.id.usersRecyclerView);
         backBtn = findViewById(R.id.backBtn);
         titleTextView = findViewById(R.id.titleTextView);
 
-        titleTextView.setText("All Users"); // 设置标题
+        titleTextView.setText("All Users");
 
         // 设置返回按钮点击事件
         backBtn.setOnClickListener(v -> onBackPressed());

@@ -31,51 +31,30 @@ import com.example.voltmart.activities.MainActivity;
 import com.example.voltmart.adapters.CartAdapter;
 import com.example.voltmart.model.CartItemModel;
 import com.example.voltmart.utils.FirebaseUtil;
+import com.example.voltmart.utils.WindowInsetsHelper;
 import com.facebook.shimmer.ShimmerFrameLayout;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.firebase.firestore.Query;
 
-/**
- * 购物车Fragment
- * 显示用户购物车中的商品列表
- * 功能包括：
- * - 显示购物车商品
- * - 修改商品数量
- * - 删除商品
- * - 计算总价
- * - 跳转到结账页面
- */
 public class CartFragment extends Fragment implements CartAdapter.CartAdapterListener {
-    // UI组件
-    TextView cartPriceTextView;      // 购物车总价显示
-    RecyclerView cartRecyclerView;   // 购物车商品列表
-    Button continueBtn;              // 继续结账按钮
-    ImageView backBtn;               // 返回按钮
-    ImageView emptyCartImageView;    // 空购物车图片
-    CartAdapter cartAdapter;         // 购物车适配器
-    int totalPrice = 0;              // 购物车总价
+    TextView cartPriceTextView;
+    RecyclerView cartRecyclerView;
+    Button continueBtn;
+    ImageView backBtn;
+    ImageView emptyCartImageView;
+    CartAdapter cartAdapter;
+    int totalPrice = 0;
 
-    // 加载状态UI
-    ShimmerFrameLayout shimmerFrameLayout; // Shimmer加载效果
-    LinearLayout mainLinearLayout;        // 主内容布局
+    ShimmerFrameLayout shimmerFrameLayout;
+    LinearLayout mainLinearLayout;
 
-    /**
-     * 无参构造函数
-     * Fragment需要无参构造函数
-     */
     public CartFragment() {
-        // Required empty public constructor
     }
 
-    /**
-     * 创建Fragment视图
-     * 初始化UI组件并加载购物车数据
-     */
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_cart, container, false);
-        // 初始化UI组件
         cartPriceTextView = view.findViewById(R.id.cartPriceTextView);
         cartRecyclerView = view.findViewById(R.id.cartRecyclerView);
         continueBtn = view.findViewById(R.id.continueBtn);
@@ -83,34 +62,34 @@ public class CartFragment extends Fragment implements CartAdapter.CartAdapterLis
         emptyCartImageView = view.findViewById(R.id.emptyCartImageView);
         shimmerFrameLayout = view.findViewById(R.id.shimmerLayout);
         mainLinearLayout = view.findViewById(R.id.mainLinearLayout);
+        
+        LinearLayout topLayout = view.findViewById(R.id.linearLayout);
+        if (topLayout != null) {
+            WindowInsetsHelper.applyTopWindowInsets(topLayout, 4);
+        }
 
         MainActivity activity = (MainActivity) getActivity();
-        activity.hideSearchBar(); // 隐藏搜索栏
-        shimmerFrameLayout.startShimmer(); // 启动Shimmer加载效果
-        emptyCartImageView.setVisibility(View.INVISIBLE); // 隐藏空购物车图片
+        activity.hideSearchBar();
+        shimmerFrameLayout.startShimmer();
+        emptyCartImageView.setVisibility(View.INVISIBLE);
 
-        getCartProducts(); // 获取购物车商品
+        getCartProducts();
 
-        // 移除可能存在的分隔线装饰
         for (int i = 0; i < cartRecyclerView.getItemDecorationCount(); i++) {
             if (cartRecyclerView.getItemDecorationAt(i) instanceof DividerItemDecoration)
                 cartRecyclerView.removeItemDecorationAt(i);
         }
 
-        // 设置继续结账按钮点击事件
         continueBtn.setOnClickListener(v -> {
             if (totalPrice == 0) {
-                // 购物车为空时提示用户
                 Toast.makeText(activity, "Your cart is empty! Add some product in your cart to proceed.", Toast.LENGTH_SHORT).show();
                 return;
             }
-            // 跳转到结账页面，传递总价
             Intent intent = new Intent(getActivity(), CheckoutActivity.class);
             intent.putExtra("price", totalPrice);
             startActivity(intent);
         });
 
-        // 设置返回按钮点击事件
         backBtn.setOnClickListener(v -> {
             activity.onBackPressed();
         });
@@ -128,6 +107,10 @@ public class CartFragment extends Fragment implements CartAdapter.CartAdapterLis
     };
 
     private void getCartProducts() {
+        if (cartAdapter != null) {
+            cartAdapter.stopListening();
+        }
+        
         Query query = FirebaseUtil.getCartItems().orderBy("timestamp", Query.Direction.DESCENDING);
         FirestoreRecyclerOptions<CartItemModel> options = new FirestoreRecyclerOptions.Builder<CartItemModel>()
                 .setQuery(query, CartItemModel.class)
@@ -165,7 +148,6 @@ public class CartFragment extends Fragment implements CartAdapter.CartAdapterLis
 
     @Override
     public void onItemsLoaded() {
-        // Stop shimmer and show main layout when items finish loading
         if (shimmerFrameLayout != null) {
             shimmerFrameLayout.stopShimmer();
             shimmerFrameLayout.setVisibility(View.GONE);
@@ -181,14 +163,11 @@ public class CartFragment extends Fragment implements CartAdapter.CartAdapterLis
         if (getActivity() != null) {
             LocalBroadcastManager.getInstance(getActivity()).registerReceiver(mMessageReceiver, new IntentFilter("price"));
         }
-        // Restart adapter listening when fragment resumes
-        // This is important when returning from checkout after items are deleted
         if (cartAdapter != null) {
-            cartAdapter.startListening();
-        } else {
-            // If adapter is null (e.g., after checkout), recreate it
-            getCartProducts();
+            cartAdapter.stopListening();
+            cartAdapter = null;
         }
+        getCartProducts();
     }
 
     @Override
@@ -199,6 +178,18 @@ public class CartFragment extends Fragment implements CartAdapter.CartAdapterLis
         }
         if (cartAdapter != null) {
             cartAdapter.stopListening();
+        }
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (cartAdapter != null) {
+            cartAdapter.stopListening();
+            cartAdapter = null;
+        }
+        if (getActivity() != null) {
+            LocalBroadcastManager.getInstance(getActivity()).unregisterReceiver(mMessageReceiver);
         }
     }
 }

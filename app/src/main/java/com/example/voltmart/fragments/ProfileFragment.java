@@ -24,6 +24,7 @@ import com.example.voltmart.activities.SplashActivity;
 import com.example.voltmart.adapters.OrderListAdapter;
 import com.example.voltmart.model.OrderItemModel;
 import com.example.voltmart.utils.FirebaseUtil;
+import com.example.voltmart.utils.WindowInsetsHelper;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
@@ -32,44 +33,29 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.UserProfileChangeRequest;
 import com.google.firebase.firestore.Query;
 
-/**
- * 个人资料Fragment
- * 显示用户个人信息和订单历史
- * 功能包括：
- * - 显示用户名称
- * - 编辑用户名称
- * - 显示订单历史
- * - 退出登录
- */
 public class ProfileFragment extends Fragment {
-    // UI组件
-    RecyclerView orderRecyclerView;  // 订单列表RecyclerView
-    OrderListAdapter orderAdapter;   // 订单列表适配器
-    LinearLayout logoutBtn;          // 退出登录按钮
-    TextView userNameTextView;       // 用户名称显示
-    ImageView editNameBtn;           // 编辑名称按钮
+    RecyclerView orderRecyclerView;
+    OrderListAdapter orderAdapter;
+    LinearLayout logoutBtn;
+    TextView userNameTextView;
+    ImageView editNameBtn;
 
-    /**
-     * 无参构造函数
-     * Fragment需要无参构造函数
-     */
     public ProfileFragment() {
-        // Required empty public constructor
     }
 
-    /**
-     * 创建Fragment视图
-     * 初始化UI组件并加载用户信息和订单数据
-     */
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view =  inflater.inflate(R.layout.fragment_profile, container, false);
-        // 初始化UI组件
         orderRecyclerView = view.findViewById(R.id.orderRecyclerView);
         logoutBtn = view.findViewById(R.id.logoutBtn);
         userNameTextView = view.findViewById(R.id.userNameTextView);
         editNameBtn = view.findViewById(R.id.editNameBtn);
+        
+        LinearLayout topLayout = view.findViewById(R.id.labelLinearLayout);
+        if (topLayout != null) {
+            WindowInsetsHelper.applyTopWindowInsets(topLayout, 4);
+        }
 
         updateUserNameDisplay(); // 更新用户名称显示
 

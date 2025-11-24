@@ -16,6 +16,7 @@ import androidx.core.view.WindowInsetsCompat;
 import com.example.voltmart.R;
 import com.example.voltmart.model.UserModel;
 import com.example.voltmart.utils.FirebaseUtil;
+import com.example.voltmart.utils.WindowInsetsHelper;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import android.util.Log;
@@ -30,43 +31,32 @@ import com.google.firebase.firestore.QuerySnapshot;
 import java.util.HashSet;
 import java.util.Set;
 
-/**
- * 管理员活动页面
- * 提供管理员功能入口，包括：
- * - 添加/修改商品
- * - 添加/修改分类
- * - 添加/修改横幅
- * - 查看订单列表
- * - 查看用户列表
- * - 查看统计数据
- */
 public class AdminActivity extends AppCompatActivity {
 
-    // UI组件
-    LinearLayout logoutBtn;  // 退出登录按钮
-    CardView addProductBtn;      // 添加商品按钮
-    CardView modifyProductBtn;   // 修改商品按钮
-    CardView addCategoryBtn;     // 添加分类按钮
-    CardView modifyCategoryBtn;  // 修改分类按钮
-    CardView addBannerBtn;       // 添加横幅按钮
-    CardView modifyBannerBtn;    // 修改横幅按钮
-    CardView deleteProductBtn;   // 删除产品按钮
-    CardView ordersCardView;     // 订单卡片（可点击）
-    CardView usersCardView;      // 用户卡片（可点击）
-    TextView countOrders;        // 订单数量显示
-    TextView usersCount;         // 用户数量显示
+    LinearLayout logoutBtn;
+    CardView addProductBtn;
+    CardView modifyProductBtn;
+    CardView addCategoryBtn;
+    CardView modifyCategoryBtn;
+    CardView addBannerBtn;
+    CardView modifyBannerBtn;
+    CardView deleteProductBtn;
+    CardView ordersCardView;
+    CardView usersCardView;
+    TextView countOrders;
+    TextView usersCount;
 
-    /**
-     * 活动创建时的初始化方法
-     * 初始化UI组件、设置点击事件、加载统计数据
-     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this); // 启用边缘到边缘显示
+        EdgeToEdge.enable(this);
         setContentView(R.layout.activity_admin);
+        
+        LinearLayout labelLinearLayout = findViewById(R.id.labelLinearLayout);
+        if (labelLinearLayout != null) {
+            WindowInsetsHelper.applyTopWindowInsets(labelLinearLayout, 4);
+        }
 
-        // 初始化UI组件
         logoutBtn = findViewById(R.id.logoutBtn);
         addProductBtn = findViewById(R.id.addProductBtn);
         modifyProductBtn = findViewById(R.id.modifyProductBtn);
@@ -80,18 +70,14 @@ public class AdminActivity extends AppCompatActivity {
         ordersCardView = findViewById(R.id.ordersCardView);
         usersCardView = findViewById(R.id.usersCardView);
 
-        getDetails();    // 获取订单统计
-        getUserCount();  // 获取用户数量
-        
-        // 自动同步用户：从orders、cart、wishlists等集合中提取用户信息
+        getDetails();
+        getUserCount();
         syncUsersFromCollections();
         
-        // 设置订单卡片的点击事件：跳转到订单列表页面
         ordersCardView.setOnClickListener(v -> {
             startActivity(new Intent(this, OrdersListActivity.class));
         });
         
-        // 设置用户卡片的点击事件：跳转到用户列表页面
         usersCardView.setOnClickListener(v -> {
             startActivity(new Intent(this, UsersListActivity.class));
         });

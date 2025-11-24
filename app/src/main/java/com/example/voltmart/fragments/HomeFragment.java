@@ -37,47 +37,25 @@ import org.imaginativeworld.whynotimagecarousel.model.CarouselItem;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 首页Fragment
- * 显示应用的主页内容，包括：
- * - 横幅轮播图（Banner）
- * - 商品分类列表
- * - 商品列表
- * 使用Shimmer效果显示加载状态
- */
 public class HomeFragment extends Fragment {
 
-    // UI组件
-    RecyclerView categoryRecyclerView;  // 分类列表RecyclerView
-    RecyclerView productRecyclerView;    // 商品列表RecyclerView
-    MaterialSearchBar searchBar;        // 搜索栏
-    ImageCarousel carousel;             // 横幅轮播图
-    ShimmerFrameLayout shimmerFrameLayout; // Shimmer加载效果布局
-    LinearLayout mainLinearLayout;      // 主内容布局
+    RecyclerView categoryRecyclerView;
+    RecyclerView productRecyclerView;
+    MaterialSearchBar searchBar;
+    ImageCarousel carousel;
+    ShimmerFrameLayout shimmerFrameLayout;
+    LinearLayout mainLinearLayout;
 
-    // 适配器
-    CategoryAdapter categoryAdapter;  // 分类适配器
-    ProductAdapter productAdapter;     // 商品适配器
+    CategoryAdapter categoryAdapter;
+    ProductAdapter productAdapter;
 
-//    TextView textView;
-
-    /**
-     * 无参构造函数
-     * Fragment需要无参构造函数
-     */
     public HomeFragment() {
-        // Required empty public constructor
     }
 
-    /**
-     * 创建Fragment视图
-     * 初始化UI组件并加载数据
-     */
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
 
-        // 填充Fragment布局
         View view = inflater.inflate(R.layout.fragment_home, container, false);
         searchBar = getActivity().findViewById(R.id.searchBar);
         categoryRecyclerView = view.findViewById(R.id.categoryRecyclerView);
@@ -87,32 +65,23 @@ public class HomeFragment extends Fragment {
         mainLinearLayout = view.findViewById(R.id.mainLinearLayout);
 
         MainActivity activity = (MainActivity) getActivity();
-        activity.showSearchBar(); // 显示搜索栏
-        shimmerFrameLayout.startShimmer(); // 启动Shimmer加载效果
+        activity.showSearchBar();
+        shimmerFrameLayout.startShimmer();
 
-        // 初始化各个组件
-        initCarousel();    // 初始化横幅轮播图
-        initCategories();  // 初始化分类列表
-        initProducts();    // 初始化商品列表
+        initCarousel();
+        initCategories();
+        initProducts();
 
         return view;
     }
 
-    /**
-     * 初始化横幅轮播图
-     * 从Firebase获取横幅数据并添加到轮播图中
-     * 显示状态为"Live"的横幅，或者status字段不存在/null的横幅（兼容旧数据）
-     */
     private void initCarousel() {
-        // 获取所有横幅，然后在客户端过滤
         FirebaseUtil.getBanner().orderBy("bannerId").get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
             @Override
             public void onComplete(@NonNull Task<QuerySnapshot> task) {
                 if (task.isSuccessful()) {
-                    // 遍历所有横幅文档，只添加Live状态或status为null的（兼容旧数据）
                     for (QueryDocumentSnapshot document : task.getResult()) {
                         String status = document.getString("status");
-                        // 如果status为null（旧数据）或者是"Live"，则显示
                         if (status == null || status.equals("Live")) {
                             carousel.addData(new CarouselItem(document.get("bannerImage").toString()));
                         }
@@ -123,13 +92,11 @@ public class HomeFragment extends Fragment {
     }
 
     private void initCategories() {
-        // First check if enabled categories exist (including those without status field for backward compatibility)
         FirebaseUtil.getCategories().get()
                 .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<QuerySnapshot> task) {
                         if (task.isSuccessful() && task.getResult() != null) {
-                            // Count enabled categories (status="Enabled" or status is null/empty for backward compatibility)
                             int enabledCount = 0;
                             for (QueryDocumentSnapshot document : task.getResult()) {
                                 String status = document.getString("status");
@@ -143,14 +110,12 @@ public class HomeFragment extends Fragment {
                                 Log.w("HomeFragment", "No enabled categories found in database");
                             } else {
                                 Log.d("HomeFragment", "Enabled categories found, should be displaying");
-                                // Make sure main layout is visible when categories load
                                 if (mainLinearLayout != null && mainLinearLayout.getVisibility() != View.VISIBLE) {
                                     shimmerFrameLayout.stopShimmer();
                                     shimmerFrameLayout.setVisibility(View.GONE);
                                     mainLinearLayout.setVisibility(View.VISIBLE);
                                     Log.d("HomeFragment", "Made mainLinearLayout visible after categories loaded");
                                     
-                                    // Force RecyclerView to layout after parent becomes visible
                                     if (categoryRecyclerView != null) {
                                         categoryRecyclerView.post(() -> {
                                             categoryRecyclerView.requestLayout();
@@ -166,9 +131,6 @@ public class HomeFragment extends Fragment {
                     }
                 });
         
-        // Get all categories and filter in adapter - we'll use a custom query that gets all categories
-        // The adapter will need to filter, but FirestoreRecyclerAdapter doesn't support client-side filtering
-        // So we'll get all categories and filter in the query result
         Query query = FirebaseUtil.getCategories();
         FirestoreRecyclerOptions<CategoryModel> options = new FirestoreRecyclerOptions.Builder<CategoryModel>()
                 .setQuery(query, CategoryModel.class)
@@ -176,13 +138,11 @@ public class HomeFragment extends Fragment {
 
         categoryAdapter = new CategoryAdapter(options, getContext());
         
-        // Set up RecyclerView - For NestedScrollView, we need to disable nested scrolling
         GridLayoutManager layoutManager = new GridLayoutManager(getContext(), 4);
         categoryRecyclerView.setLayoutManager(layoutManager);
-        categoryRecyclerView.setHasFixedSize(false); // Must be false for wrap_content in NestedScrollView
-        categoryRecyclerView.setNestedScrollingEnabled(false); // Critical for NestedScrollView
+        categoryRecyclerView.setHasFixedSize(false);
+        categoryRecyclerView.setNestedScrollingEnabled(false);
         
-        // Ensure RecyclerView is visible
         categoryRecyclerView.setVisibility(View.VISIBLE);
         categoryRecyclerView.setAdapter(categoryAdapter);
         
@@ -192,26 +152,22 @@ public class HomeFragment extends Fragment {
         
         categoryAdapter.startListening();
         
-        // Wait for data to load, then force layout
         categoryRecyclerView.postDelayed(() -> {
             if (categoryAdapter != null && categoryAdapter.getItemCount() > 0) {
                 Log.d("HomeFragment", "Category adapter itemCount: " + categoryAdapter.getItemCount());
                 Log.d("HomeFragment", "RecyclerView measured width: " + categoryRecyclerView.getMeasuredWidth() + ", height: " + categoryRecyclerView.getMeasuredHeight());
                 
-                // Force RecyclerView to measure and layout
                 categoryRecyclerView.measure(
                     View.MeasureSpec.makeMeasureSpec(categoryRecyclerView.getWidth(), View.MeasureSpec.EXACTLY),
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
                 );
                 categoryRecyclerView.requestLayout();
                 
-                // Check child count after layout
                 categoryRecyclerView.post(() -> {
                     int childCount = categoryRecyclerView.getChildCount();
                     Log.d("HomeFragment", "RecyclerView child count after layout: " + childCount);
                     if (childCount == 0) {
                         Log.e("HomeFragment", "CRITICAL: RecyclerView has NO children despite " + categoryAdapter.getItemCount() + " items!");
-                        // Try invalidating and requesting layout again
                         categoryRecyclerView.invalidate();
                         categoryRecyclerView.requestLayout();
                     }
@@ -221,7 +177,6 @@ public class HomeFragment extends Fragment {
     }
 
     private void initProducts() {
-        // 先获取产品数据，用于更新SearchFragment缓存
         FirebaseUtil.getProducts()
                 .get()
                 .addOnCompleteListener(task -> {
@@ -229,20 +184,16 @@ public class HomeFragment extends Fragment {
                         int count = task.getResult().size();
                         Log.d("HomeFragment", "Products count = " + count);
 
-                        // ✨ 关键三行：关 shimmer / 显示主内容
                         shimmerFrameLayout.stopShimmer();
                         shimmerFrameLayout.setVisibility(View.GONE);
                         mainLinearLayout.setVisibility(View.VISIBLE);
                         
-                        // 更新SearchFragment的缓存，实现预加载
-                        // 这样用户进入搜索页面时，产品已经加载好了
                         if (task.getResult() != null) {
                             List<ProductModel> products = new ArrayList<>();
                             for (QueryDocumentSnapshot document : task.getResult()) {
                                 ProductModel product = document.toObject(ProductModel.class);
                                 products.add(product);
                             }
-                            // 更新SearchFragment的缓存
                             SearchFragment.updateProductCache(products);
                             Log.d("HomeFragment", "Updated SearchFragment cache with " + products.size() + " products");
                         }

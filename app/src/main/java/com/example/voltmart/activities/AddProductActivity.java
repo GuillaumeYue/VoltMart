@@ -12,6 +12,7 @@ import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -26,6 +27,7 @@ import androidx.core.view.WindowInsetsCompat;
 import com.example.voltmart.R;
 import com.example.voltmart.model.ProductModel;
 import com.example.voltmart.utils.FirebaseUtil;
+import com.example.voltmart.utils.WindowInsetsHelper;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -60,35 +62,32 @@ import cn.pedant.SweetAlert.SweetAlertDialog;
  */
 public class AddProductActivity extends AppCompatActivity {
 
-    // UI组件 - 输入框
-    TextInputEditText idEditText;        // 商品ID输入框
-    TextInputEditText nameEditText;      // 商品名称输入框
-    TextInputEditText descEditText;      // 商品描述输入框
-    TextInputEditText specEditText;      // 商品规格输入框
-    TextInputEditText stockEditText;     // 库存输入框
-    TextInputEditText priceEditText;     // 价格输入框
-    TextInputEditText discountEditText;  // 折扣输入框
-    Button imageBtn;                     // 选择图片按钮
-    Button addProductBtn;                // 添加商品按钮
-    ImageView backBtn;                    // 返回按钮
-    ImageView productImageView;          // 商品图片预览
-    TextView removeImageBtn;              // 移除图片按钮
+    TextInputEditText idEditText;
+    TextInputEditText nameEditText;
+    TextInputEditText descEditText;
+    TextInputEditText specEditText;
+    TextInputEditText stockEditText;
+    TextInputEditText priceEditText;
+    TextInputEditText discountEditText;
+    Button imageBtn;
+    Button addProductBtn;
+    ImageView backBtn;
+    ImageView productImageView;
+    TextView removeImageBtn;
 
-    // UI组件 - 分类下拉框
-    AutoCompleteTextView categoryDropDown; // 分类下拉选择框
-    ArrayAdapter<String> arrayAdapter;     // 分类适配器
-    String[] categories;                   // 分类数组
+    AutoCompleteTextView categoryDropDown;
+    ArrayAdapter<String> arrayAdapter;
+    String[] categories;
 
-    // 数据
-    String category;          // 选中的分类
-    String productImage;      // 商品图片URL
-    String shareLink;         // 商品分享链接
-    String productName;       // 商品名称
-    int productId = 1;        // 商品ID（初始化为默认值1）
-    Context context = this;   // 上下文
-    boolean imageUploaded = false; // 图片是否已上传
+    String category;
+    String productImage;
+    String shareLink;
+    String productName;
+    int productId = 1;
+    Context context = this;
+    boolean imageUploaded = false;
 
-    SweetAlertDialog dialog;  // 进度对话框
+    SweetAlertDialog dialog;
 
 
     @Override
@@ -96,6 +95,11 @@ public class AddProductActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_add_product);
+        
+        LinearLayout topLayout = findViewById(R.id.topHeaderLayout);
+        if (topLayout != null) {
+            WindowInsetsHelper.applyTopWindowInsets(topLayout, 4);
+        }
 
         idEditText = findViewById(R.id.idEditText);
         nameEditText = findViewById(R.id.nameEditText);

@@ -21,6 +21,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.voltmart.R;
 import com.example.voltmart.model.BannerModel;
 import com.example.voltmart.utils.FirebaseUtil;
+import com.example.voltmart.utils.WindowInsetsHelper;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
@@ -54,6 +55,11 @@ public class DeleteBannerActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_delete_banner);
+        
+        LinearLayout topLayout = findViewById(R.id.topHeaderLayout);
+        if (topLayout != null) {
+            WindowInsetsHelper.applyTopWindowInsets(topLayout, 4);
+        }
 
         detailsLinearLayout = findViewById(R.id.detailsLinearLayout);
         idDropDown = findViewById(R.id.idDropDown);

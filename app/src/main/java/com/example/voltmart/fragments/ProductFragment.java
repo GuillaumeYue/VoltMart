@@ -30,6 +30,7 @@ import com.example.voltmart.model.CartItemModel;
 import com.example.voltmart.model.ProductModel;
 import com.example.voltmart.model.ReviewModel;
 import com.example.voltmart.utils.FirebaseUtil;
+import com.example.voltmart.utils.WindowInsetsHelper;
 import com.facebook.shimmer.ShimmerFrameLayout;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
@@ -54,40 +55,36 @@ import java.text.DecimalFormat;
  * - 相似商品推荐
  */
 public class ProductFragment extends Fragment {
-    // UI组件 - 商品信息
-    ImageView productImage;        // 商品图片
-    ImageView backBtn;             // 返回按钮
-    ImageView shareBtn;            // 分享按钮
-    TextView productName;          // 商品名称
-    TextView productDescription;  // 商品描述
-    TextView productSpec;          // 商品规格
-    TextView productPrice;         // 现价
-    TextView originalPrice;        // 原价
-    TextView discountPercentage;   // 折扣百分比
-    TextView ratingTextView;       // 评分显示
-    TextView noOfRatingTextView;   // 评分人数显示
-    Button addToCartBtn;           // 添加到购物车按钮
-    MaterialCardView wishlistBtn;  // 愿望单按钮
-    ImageView wishlistImageView;  // 愿望单图标
-    RatingBar ratingBar;           // 评分条
+    ImageView productImage;
+    ImageView backBtn;
+    ImageView shareBtn;
+    TextView productName;
+    TextView productDescription;
+    TextView productSpec;
+    TextView productPrice;
+    TextView originalPrice;
+    TextView discountPercentage;
+    TextView ratingTextView;
+    TextView noOfRatingTextView;
+    Button addToCartBtn;
+    MaterialCardView wishlistBtn;
+    ImageView wishlistImageView;
+    RatingBar ratingBar;
 
-    // UI组件 - 动画和加载
-    LottieAnimationView wishlistLottie;  // 愿望单动画
-    LottieAnimationView cartLottie;      // 购物车动画
-    ShimmerFrameLayout shimmerFrameLayout; // Shimmer加载效果
+    LottieAnimationView wishlistLottie;
+    LottieAnimationView cartLottie;
+    ShimmerFrameLayout shimmerFrameLayout;
 
-    // UI组件 - 列表
-    RecyclerView reviewRecyclerView;        // 评论列表
-    RecyclerView similarProductRecyclerView; // 相似商品列表
-    ReviewAdapter reviewAdapter;            // 评论适配器
-    ProductAdapter similarProductAdapter;   // 相似商品适配器
-    LinearLayout mainLinearlayout;          // 主内容布局
+    RecyclerView reviewRecyclerView;
+    RecyclerView similarProductRecyclerView;
+    ReviewAdapter reviewAdapter;
+    ProductAdapter similarProductAdapter;
+    LinearLayout mainLinearlayout;
 
-    // 数据
-    int productId;              // 商品ID
-    boolean wishlisted = false;  // 是否已添加到愿望单
+    int productId;
+    boolean wishlisted = false;
 
-    ProductModel currentProduct = new ProductModel(); // 当前商品数据模型
+    ProductModel currentProduct = new ProductModel();
 
     public ProductFragment() {
         // Required empty public constructor
@@ -96,7 +93,6 @@ public class ProductFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
         View view = inflater.inflate(R.layout.fragment_product, container, false);
         productImage = view.findViewById(R.id.productImage);
         productName = view.findViewById(R.id.productName);
@@ -120,6 +116,11 @@ public class ProductFragment extends Fragment {
         reviewRecyclerView = view.findViewById(R.id.reviewRecyclerView);
         similarProductRecyclerView = view.findViewById(R.id.similarProductRecyclerView);
         mainLinearlayout = view.findViewById(R.id.mainLinearLayout);
+        
+        androidx.constraintlayout.widget.ConstraintLayout topLayout = view.findViewById(R.id.linearLayout);
+        if (topLayout != null) {
+            WindowInsetsHelper.applyTopWindowInsets(topLayout, 4);
+        }
 
         MainActivity activity = (MainActivity) getActivity();
         activity.hideSearchBar();

@@ -19,57 +19,42 @@ import com.example.voltmart.activities.MainActivity;
 import com.example.voltmart.adapters.SearchAdapter;
 import com.example.voltmart.model.ProductModel;
 import com.example.voltmart.utils.FirebaseUtil;
+import com.example.voltmart.utils.WindowInsetsHelper;
+import android.widget.LinearLayout;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.firebase.firestore.Query;
 
-/**
- * 分类商品Fragment
- * 显示指定分类下的所有商品
- * 功能包括：
- * - 根据分类名称查询商品
- * - 支持多种分类名称格式（原始、小写、规范化等）
- * - 自动尝试不同的分类名称变体直到找到商品
- */
 public class CategoryFragment extends Fragment {
 
-    // UI组件
-    RecyclerView productRecyclerView;  // 商品列表RecyclerView
-    SearchAdapter searchProductAdapter; // 商品适配器
-    ImageView backBtn;                 // 返回按钮
-    TextView labelTextView;            // 分类名称标签
+    RecyclerView productRecyclerView;
+    SearchAdapter searchProductAdapter;
+    ImageView backBtn;
+    TextView labelTextView;
 
-    // 数据
-    String categoryName;               // 分类名称
-    private android.os.Handler categoryCheckHandler; // 分类检查Handler（用于超时检查）
+    String categoryName;
+    private android.os.Handler categoryCheckHandler;
 
-    /**
-     * 无参构造函数
-     * Fragment需要无参构造函数
-     */
     public CategoryFragment() {
-        // Required empty public constructor
     }
 
-
-    /**
-     * 创建Fragment视图
-     * 初始化UI组件并加载分类商品
-     */
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        // 填充Fragment布局
         View view =  inflater.inflate(R.layout.fragment_category, container, false);
         labelTextView = view.findViewById(R.id.labelTextView);
         productRecyclerView = view.findViewById(R.id.productRecyclerView);
         backBtn = view.findViewById(R.id.backBtn);
+        
+        LinearLayout topLayout = view.findViewById(R.id.titleLinearLayout);
+        if (topLayout != null) {
+            WindowInsetsHelper.applyTopWindowInsets(topLayout, 4);
+        }
 
-        // 从参数中获取分类名称（带空值安全检查）
         Bundle args = getArguments();
         if (args != null) {
             categoryName = args.getString("categoryName", "Electronics");
         } else {
-            categoryName = "Electronics"; // 默认分类
+            categoryName = "Electronics";
         }
 
         labelTextView.setText(categoryName); // 显示分类名称

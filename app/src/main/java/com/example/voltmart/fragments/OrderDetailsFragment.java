@@ -22,6 +22,8 @@ import com.example.voltmart.model.OrderItemModel;
 import com.example.voltmart.model.ProductModel;
 import com.example.voltmart.model.ReviewModel;
 import com.example.voltmart.utils.FirebaseUtil;
+import com.example.voltmart.utils.WindowInsetsHelper;
+import android.widget.LinearLayout;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.material.textfield.TextInputEditText;
@@ -35,46 +37,31 @@ import com.squareup.picasso.Picasso;
 
 import cn.pedant.SweetAlert.SweetAlertDialog;
 
-/**
- * 订单详情Fragment
- * 显示订单的详细信息并允许用户提交评论
- * 功能包括：
- * - 显示订单信息（商品、用户信息、配送地址等）
- * - 提交商品评论和评分
- * - 编辑已有评论
- */
 public class OrderDetailsFragment extends Fragment {
 
-    // UI组件 - 订单信息显示
-    TextView productNameTextView;  // 商品名称
-    TextView orderIdTextView;       // 订单ID
-    TextView nameTextView;         // 收货人姓名
-    TextView emailTextView;        // 收货人邮箱
-    TextView phoneTextView;        // 收货人电话
-    TextView addressTextView;      // 收货地址
-    TextView commentTextView;       // 订单备注
-    ImageView productImageView;    // 商品图片
-    LinearLayout productLinearLayout; // 商品布局
+    TextView productNameTextView;
+    TextView orderIdTextView;
+    TextView nameTextView;
+    TextView emailTextView;
+    TextView phoneTextView;
+    TextView addressTextView;
+    TextView commentTextView;
+    ImageView productImageView;
+    LinearLayout productLinearLayout;
 
-    // UI组件 - 评论相关
-    RatingBar ratingBar;           // 评分条
-    TextInputEditText titleReviewEditText; // 评论标题输入框
-    TextInputEditText reviewEditText;      // 评论内容输入框
-    Button submitBtn;              // 提交按钮
-    ImageView backBtn;             // 返回按钮
+    RatingBar ratingBar;
+    TextInputEditText titleReviewEditText;
+    TextInputEditText reviewEditText;
+    Button submitBtn;
+    ImageView backBtn;
 
-    // 数据模型
-    OrderItemModel orderItem;      // 订单项数据
-    ProductModel productModel;     // 商品数据
-    ReviewModel oldReviewModel;    // 已有评论数据（如果存在）
-    SweetAlertDialog dialog;       // 进度对话框
+    OrderItemModel orderItem;
+    ProductModel productModel;
+    ReviewModel oldReviewModel;
+    SweetAlertDialog dialog;
 
-    boolean isNew = true;          // 是否是新评论（true=新评论，false=编辑已有评论）
+    boolean isNew = true;
 
-    /**
-     * 无参构造函数
-     * Fragment需要无参构造函数
-     */
     public OrderDetailsFragment() {
 
     }
@@ -99,6 +86,11 @@ public class OrderDetailsFragment extends Fragment {
         reviewEditText = view.findViewById(R.id.reviewEditText);
         backBtn = view.findViewById(R.id.backBtn);
         submitBtn = view.findViewById(R.id.submitBtn);
+        
+        LinearLayout topLayout = view.findViewById(R.id.linearLayout);
+        if (topLayout != null) {
+            WindowInsetsHelper.applyTopWindowInsets(topLayout, 4);
+        }
 
         MainActivity activity = (MainActivity) getActivity();
         activity.hideSearchBar();

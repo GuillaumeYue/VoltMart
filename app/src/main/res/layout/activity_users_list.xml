@@ -7,11 +7,13 @@
     android:background="@color/backgroundSecondary">
 
     <LinearLayout
+        android:id="@+id/topHeaderLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/my_secondary"
         android:orientation="horizontal"
-        android:padding="16dp">
+        android:padding="16dp"
+        android:paddingTop="64dp">
 
         <ImageView
             android:id="@+id/backBtn"

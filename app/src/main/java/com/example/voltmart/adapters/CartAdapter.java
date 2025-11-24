@@ -30,46 +30,26 @@ import com.google.firebase.firestore.QuerySnapshot;
 import com.squareup.picasso.Callback;
 import com.squareup.picasso.Picasso;
 
-/**
- * 购物车适配器
- * 用于在RecyclerView中显示购物车商品列表
- * 继承自FirestoreRecyclerAdapter，自动同步Firestore数据
- */
 public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAdapter.CartViewHolder> {
 
-    /**
-     * 购物车适配器监听器接口
-     * 用于通知Fragment购物车状态变化
-     */
     public interface CartAdapterListener {
-        void onCartEmpty();      // 购物车为空时调用
-        void onCartHasItems();   // 购物车有商品时调用
-        void onItemsLoaded();    // 商品加载完成时调用
+        void onCartEmpty();
+        void onCartHasItems();
+        void onItemsLoaded();
     }
 
-    private Context context;                    // 上下文
-    private AppCompatActivity activity;         // 活动实例
-    private CartAdapterListener listener;        // 监听器
-    final int[] stock = new int[1];            // 库存（使用数组包装以便在内部类中修改）
-    int totalPrice = 0;                          // 总价
-    boolean gotSum = false;                     // 是否已计算总价
-    int count;                                  // 计数器
+    private Context context;
+    private AppCompatActivity activity;
+    private CartAdapterListener listener;
+    final int[] stock = new int[1];
+    int totalPrice = 0;
+    boolean gotSum = false;
+    int count;
 
-    /**
-     * 设置购物车适配器监听器
-     * @param listener 监听器实例
-     */
     public void setCartAdapterListener(CartAdapterListener listener) {
         this.listener = listener;
     }
 
-    /**
-     * 绑定ViewHolder数据
-     * 将购物车商品数据绑定到ViewHolder的UI组件上
-     * @param holder ViewHolder实例
-     * @param position 位置
-     * @param model 购物车商品数据模型
-     */
     @Override
     protected void onBindViewHolder(@NonNull CartViewHolder holder, int position, @NonNull CartItemModel model) {
         if (activity != null) {
@@ -91,7 +71,8 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
         Picasso.get().load(model.getImage()).into(holder.productCartImage, new Callback() {
             @Override
             public void onSuccess() {
-                if (holder.getBindingAdapterPosition() == getSnapshots().size()-1) {
+                int adapterPosition = holder.getAdapterPosition();
+                if (adapterPosition != RecyclerView.NO_POSITION && adapterPosition == getItemCount() - 1) {
                     if (listener != null) {
                         listener.onItemsLoaded();
                     }
@@ -203,6 +184,9 @@ public class CartAdapter extends FirestoreRecyclerAdapter<CartItemModel, CartAda
     @Override
     public void onDataChanged() {
         super.onDataChanged();
+        totalPrice = 0;
+        gotSum = false;
+        
         if (context == null) {
             return;
         }
