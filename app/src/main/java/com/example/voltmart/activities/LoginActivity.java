@@ -32,6 +32,7 @@ import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.GoogleAuthProvider;
 
 /**
@@ -46,6 +47,7 @@ public class LoginActivity extends AppCompatActivity {
     EditText emailEditText, passEditText; // 邮箱和密码输入框
     ImageView loginBtn;                   // 登录按钮
     TextView signupPageBtn;               // 跳转到注册页面的按钮
+    TextView forgotPasswordBtn;            // 忘记密码按钮
     Button googleLoginBtn;                 // Google登录按钮
 
     // Firebase和Google登录相关
@@ -68,6 +70,7 @@ public class LoginActivity extends AppCompatActivity {
         passEditText = findViewById(R.id.passEditText);
         loginBtn = findViewById(R.id.loginBtn);
         signupPageBtn = findViewById(R.id.signupPageBtn);
+        forgotPasswordBtn = findViewById(R.id.forgotPasswordBtn);
         googleLoginBtn = findViewById(R.id.googleLoginBtn);
 
         // 设置登录按钮点击事件
@@ -83,6 +86,14 @@ public class LoginActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 startActivity(new Intent(LoginActivity.this, SignupActivity.class));
+            }
+        });
+        
+        // 设置忘记密码按钮点击事件
+        forgotPasswordBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                resetPassword();
             }
         });
         
@@ -191,6 +202,49 @@ public class LoginActivity extends AppCompatActivity {
             flag = 1; // 设置错误标志
         }
         return flag == 0; // 返回验证结果
+    }
+
+    /**
+     * 发送密码重置邮件
+     * 验证邮箱格式后，使用Firebase发送密码重置邮件
+     */
+    private void resetPassword() {
+        String email = emailEditText.getText().toString().trim();
+        
+        if (email.isEmpty()) {
+            emailEditText.setError("Email is required");
+            emailEditText.requestFocus();
+            return;
+        }
+        
+        if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            emailEditText.setError("Email is invalid");
+            emailEditText.requestFocus();
+            return;
+        }
+        
+        changeInProgress(true);
+        
+        firebaseAuth.sendPasswordResetEmail(email).addOnCompleteListener(new OnCompleteListener<Void>() {
+            @Override
+            public void onComplete(@NonNull Task<Void> task) {
+                changeInProgress(false);
+                if (task.isSuccessful()) {
+                    Toast.makeText(LoginActivity.this, "Password reset email sent! Check your inbox.", Toast.LENGTH_LONG).show();
+                } else {
+                    String errorMessage = "Failed to send reset email. Please try again.";
+                    if (task.getException() != null && task.getException() instanceof FirebaseAuthException) {
+                        String errorCode = ((FirebaseAuthException) task.getException()).getErrorCode();
+                        if (errorCode.equals("ERROR_USER_NOT_FOUND")) {
+                            errorMessage = "No account found with this email address.";
+                        } else if (errorCode.equals("ERROR_INVALID_EMAIL")) {
+                            errorMessage = "Invalid email address.";
+                        }
+                    }
+                    Toast.makeText(LoginActivity.this, errorMessage, Toast.LENGTH_LONG).show();
+                }
+            }
+        });
     }
 
     /**
